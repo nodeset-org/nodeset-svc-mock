@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"crypto/ecdsa"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -20,28 +22,47 @@ const (
 
 type Authorizer struct {
 	authMessageHash []byte
+	logger          *slog.Logger
 }
 
-func NewAuthorizer() (*Authorizer, error) {
+func NewAuthorizer(logger *slog.Logger) *Authorizer {
 	authMessageHash := accounts.TextHash([]byte(nodesetAuthMessage))
 	return &Authorizer{
 		authMessageHash: authMessageHash,
-	}, nil
+		logger:          logger,
+	}
 }
 
 // Verifies an incoming request has a valid signature, and returns the address of the signer
-func (a *Authorizer) VerifyRequest(r *http.Request) (common.Address, error) {
+func (a *Authorizer) VerifyRequest(r *http.Request) (common.Address, bool, error) {
 	authHeaderVals, exists := r.Header[authHeader]
 	if !exists || len(authHeaderVals) == 0 {
-		return common.Address{}, fmt.Errorf("no auth header found")
+		return common.Address{}, false, nil
 	}
 
 	authBytes, err := utils.DecodeHex(authHeaderVals[0])
 	if err != nil {
-		return common.Address{}, fmt.Errorf("error decoding auth header: %w", err)
+		return common.Address{}, false, fmt.Errorf("error decoding auth header: %w", err)
 	}
 
-	return a.getAddressFromSignature(authBytes)
+	address, err := a.getAddressFromSignature(authBytes)
+	return address, true, err
+}
+
+// =============
+// === Utils ===
+// =============
+
+func AddAuthorizationHeader(request *http.Request, privateKey *ecdsa.PrivateKey) error {
+	// Sign the auth message
+	messageHash := accounts.TextHash([]byte(nodesetAuthMessage))
+	signature, err := crypto.Sign(messageHash, privateKey)
+	if err != nil {
+		return fmt.Errorf("error signing auth message: %v", err)
+	}
+	request.Header.Set(authHeader, utils.EncodeHexWithPrefix(signature))
+	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	return nil
 }
 
 // ==========================

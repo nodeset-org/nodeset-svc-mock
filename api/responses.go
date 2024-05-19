@@ -1,4 +1,4 @@
-package types
+package api
 
 import (
 	"github.com/rocket-pool/node-manager-core/beacon"
@@ -25,6 +25,12 @@ type ValidatorStatus struct {
 // api/dev/validators
 type ValidatorsResponse struct {
 	Data []ValidatorStatus `json:"data"`
+}
+
+// Generic response for errors
+type ErrorResponse struct {
+	Ok      bool   `json:"ok"`
+	Message string `json:"message"`
 }
 
 // Status types for StakeWise validators

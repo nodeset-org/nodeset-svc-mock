@@ -17,7 +17,7 @@ func NewUser(email string) *User {
 }
 
 func (u *User) AddNode(nodeAddress common.Address) {
-	if _, exists := u.Nodes[nodeAddress]; exists {
+	if _, exists := u.Nodes[nodeAddress]; !exists {
 		node := NewNode(nodeAddress)
 		u.Nodes[nodeAddress] = node
 	}
@@ -26,7 +26,7 @@ func (u *User) AddNode(nodeAddress common.Address) {
 func (u *User) Clone() *User {
 	clone := NewUser(u.Email)
 	for address, node := range u.Nodes {
-		clone.Nodes[address] = node
+		clone.Nodes[address] = node.Clone()
 	}
 	return clone
 }

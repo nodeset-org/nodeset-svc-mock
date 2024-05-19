@@ -2,9 +2,10 @@ package db
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/nodeset-org/nodeset-svc-mock/types"
+	"github.com/nodeset-org/nodeset-svc-mock/api"
 	"github.com/rocket-pool/node-manager-core/beacon"
 )
 
@@ -17,14 +18,18 @@ type Database struct {
 	Users map[string]*User
 
 	// Latest deposit data set uploaded to StakeWise
-	LatestDepositDataSet uint
+	LatestDepositDataSet int
+
+	// Internal fields
+	logger *slog.Logger
 }
 
 // Creates a new database
-func NewDatabase() *Database {
+func NewDatabase(logger *slog.Logger) *Database {
 	return &Database{
 		StakeWiseVaults: map[string]map[common.Address]*StakeWiseVault{},
 		Users:           map[string]*User{},
+		logger:          logger,
 	}
 }
 
@@ -71,7 +76,7 @@ func (d *Database) AddNodeAccount(email string, nodeAddress common.Address) erro
 
 // Clones the database
 func (d *Database) Clone() *Database {
-	clone := NewDatabase()
+	clone := NewDatabase(d.logger)
 	clone.LatestDepositDataSet = d.LatestDepositDataSet
 
 	// Copy StakeWise vaults
@@ -88,6 +93,21 @@ func (d *Database) Clone() *Database {
 		clone.Users[email] = user.Clone()
 	}
 	return clone
+}
+
+// ===============
+// === Getters ===
+// ===============
+
+func (d *Database) GetNode(address common.Address) *Node {
+	for _, user := range d.Users {
+		for candidateAddress, candidate := range user.Nodes {
+			if candidateAddress == address {
+				return candidate
+			}
+		}
+	}
+	return nil
 }
 
 // ==========================
@@ -119,7 +139,7 @@ func (d *Database) HandleDepositDataUpload(nodeAddress common.Address, data []be
 }
 
 // Handle a new collection of signed exits from a node
-func (d *Database) HandleSignedExitUpload(nodeAddress common.Address, network string, data []types.ExitData) error {
+func (d *Database) HandleSignedExitUpload(nodeAddress common.Address, network string, data []api.ExitData) error {
 	// Get the node
 	var node *Node
 	for _, user := range d.Users {

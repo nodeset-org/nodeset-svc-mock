@@ -2,21 +2,27 @@ package manager
 
 import (
 	"fmt"
+	"log/slog"
 
+	"github.com/nodeset-org/nodeset-svc-mock/auth"
 	"github.com/nodeset-org/nodeset-svc-mock/db"
 )
 
 type NodeSetMockManager struct {
-	Database *db.Database
+	Database   *db.Database
+	Authorizer *auth.Authorizer
 
 	// Internal fields
 	snapshots map[string]*db.Database
+	logger    *slog.Logger
 }
 
-func NewNodesetMockManager() *NodeSetMockManager {
+func NewNodeSetMockManager(logger *slog.Logger) *NodeSetMockManager {
 	return &NodeSetMockManager{
-		Database:  db.NewDatabase(),
-		snapshots: map[string]*db.Database{},
+		Database:   db.NewDatabase(logger),
+		Authorizer: auth.NewAuthorizer(logger),
+		snapshots:  map[string]*db.Database{},
+		logger:     logger,
 	}
 }
 

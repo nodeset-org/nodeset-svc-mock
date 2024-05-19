@@ -1,4 +1,4 @@
-package types
+package api
 
 type ExitMessageDetails struct {
 	Epoch          string `json:"epoch"`

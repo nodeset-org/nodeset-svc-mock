@@ -3,45 +3,49 @@ package db
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/rocket-pool/node-manager-core/beacon"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/nodeset-org/nodeset-svc-mock/test_utils"
 )
 
-const (
-	stakeWiseVaultAddressHex string = "0x57ace215eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-	network                  string = "holesky"
-	userEmail                string = "test@test.com"
-	nodeAddress0Hex          string = "0x90de00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-	nodeAddress1Hex          string = "0x90de01eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-	pubkeyHex                string = "0xbeac09bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-)
+const ()
 
 func TestDatabaseClone(t *testing.T) {
+	logger := slog.Default()
+
 	// Create a new database
-	db := NewDatabase()
+	db := NewDatabase(logger)
 
 	// Add a StakeWise vault to the database
-	stakeWiseVaultAddress := common.HexToAddress(stakeWiseVaultAddressHex)
-	err := db.AddStakeWiseVault(stakeWiseVaultAddress, network)
+	err := db.AddStakeWiseVault(test_utils.StakeWiseVaultAddress, test_utils.Network)
 	if err != nil {
 		t.Fatalf("Error adding StakeWise vault to database: %v", err)
 	}
 	t.Log("Added StakeWise vault to database")
 
 	// Add a user to the database
-	err = db.AddUser(userEmail)
+	err = db.AddUser(test_utils.UserEmail)
 	if err != nil {
 		t.Fatalf("Error adding user to database: %v", err)
 	}
 	t.Log("Added user to database")
 
 	// Add nodes to the user
+	node0, err := test_utils.GetPrivateKey(0)
+	if err != nil {
+		t.Fatalf("Error getting private key for node 0: %v", err)
+	}
+	node1, err := test_utils.GetPrivateKey(1)
+	if err != nil {
+		t.Fatalf("Error getting private key for node 1: %v", err)
+	}
 	errs := []error{
-		addNodeToDatabase(db, userEmail, nodeAddress0Hex),
-		addNodeToDatabase(db, userEmail, nodeAddress1Hex),
+		addNodeToDatabase(db, test_utils.UserEmail, crypto.PubkeyToAddress(node0.PublicKey)),
+		addNodeToDatabase(db, test_utils.UserEmail, crypto.PubkeyToAddress(node1.PublicKey)),
 	}
 	if err := errors.Join(errs...); err != nil {
 		t.Fatalf("Error adding nodes to database: %v", err)
@@ -62,25 +66,21 @@ func TestDatabaseClone(t *testing.T) {
 	}
 
 	// Mark deposit data uploaded for the StakeWise vault
-	pubkey, err := beacon.HexToValidatorPubkey(pubkeyHex)
-	if err != nil {
-		t.Fatalf("Error parsing pubkey: %v", err)
-	}
-	db.StakeWiseVaults[network][stakeWiseVaultAddress].MarkDepositDataUploaded(pubkey)
+	pubkey := test_utils.Pubkey
+	db.StakeWiseVaults[test_utils.Network][test_utils.StakeWiseVaultAddress].MarkDepositDataUploaded(pubkey)
 	t.Log("Marked deposit data uploaded for StakeWise vault")
 
 	// Make sure the clone didn't get the update
-	if clone.StakeWiseVaults[network][stakeWiseVaultAddress].UploadedData[pubkey] {
+	if clone.StakeWiseVaults[test_utils.Network][test_utils.StakeWiseVaultAddress].UploadedData[pubkey] {
 		t.Fatalf("Clone got the update")
 	}
 	t.Log("Clone wasn't updated, as expected")
 }
 
-func addNodeToDatabase(db *Database, userEmail string, nodeAddressHex string) error {
-	nodeAddress := common.HexToAddress(nodeAddressHex)
+func addNodeToDatabase(db *Database, userEmail string, nodeAddress common.Address) error {
 	err := db.AddNodeAccount(userEmail, nodeAddress)
 	if err != nil {
-		return fmt.Errorf("Error adding node [%s] to user [%s]: %w", nodeAddressHex, userEmail, err)
+		return fmt.Errorf("Error adding node [%s] to user [%s]: %w", nodeAddress.Hex(), userEmail, err)
 	}
 	return nil
 }

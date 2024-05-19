@@ -1,14 +1,14 @@
 package db
 
 import (
-	"github.com/nodeset-org/nodeset-svc-mock/types"
+	"github.com/nodeset-org/nodeset-svc-mock/api"
 	"github.com/rocket-pool/node-manager-core/beacon"
 )
 
 type Validator struct {
 	Pubkey              beacon.ValidatorPubkey
 	DepositData         beacon.ExtendedDepositData
-	SignedExit          types.ExitMessage
+	SignedExit          api.ExitMessage
 	ExitMessageUploaded bool
 	DepositDataUsed     bool
 }
@@ -24,7 +24,7 @@ func (v *Validator) UseDepositData() {
 	v.DepositDataUsed = true
 }
 
-func (v *Validator) SetExitMessage(exitMessage types.ExitMessage) {
+func (v *Validator) SetExitMessage(exitMessage api.ExitMessage) {
 	// Normally this is where validation would occur
 	v.SignedExit = exitMessage
 	v.ExitMessageUploaded = true
