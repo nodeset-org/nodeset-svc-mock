@@ -10,7 +10,7 @@ import (
 
 	"github.com/nodeset-org/nodeset-svc-mock/api"
 	"github.com/nodeset-org/nodeset-svc-mock/auth"
-	"github.com/nodeset-org/nodeset-svc-mock/test_utils"
+	"github.com/nodeset-org/nodeset-svc-mock/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -134,7 +134,7 @@ func TestUnregisteredNode(t *testing.T) {
 	t.Logf("Created request")
 
 	// Add an auth header
-	node0Key, err := test_utils.GetEthPrivateKey(0)
+	node0Key, err := test.GetEthPrivateKey(0)
 	if err != nil {
 		t.Fatalf("error getting private key: %v", err)
 	}

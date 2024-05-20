@@ -94,7 +94,14 @@ func (s *NodeSetMockServer) GetPort() uint16 {
 
 // Register all of the routes
 func (s *NodeSetMockServer) registerRoutes(nmcRouter *mux.Router) {
-	nmcRouter.HandleFunc("/"+api.DepositDataMetaPath, s.depositDataMeta)
+	nmcRouter.HandleFunc("/"+api.DepositDataMetaPath, func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			s.depositDataMeta(w, r)
+		default:
+			handleInvalidMethod(s.logger, w)
+		}
+	})
 	nmcRouter.HandleFunc("/"+api.DepositDataPath, func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -105,51 +112,45 @@ func (s *NodeSetMockServer) registerRoutes(nmcRouter *mux.Router) {
 			handleInvalidMethod(s.logger, w)
 		}
 	})
+	nmcRouter.HandleFunc("/"+api.ValidatorsPath, func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			s.getValidators(w, r)
+		case http.MethodPatch:
+			s.uploadSignedExits(w, r)
+		default:
+			handleInvalidMethod(s.logger, w)
+		}
+	})
 }
 
 // =============
 // === Utils ===
 // =============
 
-func (s *NodeSetMockServer) processGet(w http.ResponseWriter, r *http.Request) (*db.Node, url.Values) {
+func (s *NodeSetMockServer) processRequest(w http.ResponseWriter, r *http.Request, requestBody any) (*db.Node, url.Values) {
 	args := r.URL.Query()
 	s.logger.Info("New request", slog.String(log.MethodKey, r.Method), slog.String(log.PathKey, r.URL.Path))
 	s.logger.Debug("Request params:", slog.String(log.QueryKey, r.URL.RawQuery))
 
-	// Check the method
-	if r.Method != http.MethodGet {
-		handleInvalidMethod(s.logger, w)
-		return nil, nil
+	if requestBody != nil {
+		// Read the body
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			handleInputError(s.logger, w, fmt.Errorf("error reading request body: %w", err))
+			return nil, nil
+		}
+		s.logger.Debug("Request body:", slog.String(log.BodyKey, string(bodyBytes)))
+
+		// Deserialize the body
+		err = json.Unmarshal(bodyBytes, &requestBody)
+		if err != nil {
+			handleInputError(s.logger, w, fmt.Errorf("error deserializing request body: %w", err))
+			return nil, nil
+		}
 	}
 
 	return s.processAuthHeader(w, r), args
-}
-
-func (s *NodeSetMockServer) processPost(w http.ResponseWriter, r *http.Request, requestBody any) *db.Node {
-	s.logger.Info("New request", slog.String(log.MethodKey, r.Method), slog.String(log.PathKey, r.URL.Path))
-
-	// Check the method
-	if r.Method != http.MethodPost {
-		handleInvalidMethod(s.logger, w)
-		return nil
-	}
-
-	// Read the body
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		handleInputError(s.logger, w, fmt.Errorf("error reading request body: %w", err))
-		return nil
-	}
-	s.logger.Debug("Request body:", slog.String(log.BodyKey, string(bodyBytes)))
-
-	// Deserialize the body
-	err = json.Unmarshal(bodyBytes, &requestBody)
-	if err != nil {
-		handleInputError(s.logger, w, fmt.Errorf("error deserializing request body: %w", err))
-		return nil
-	}
-
-	return s.processAuthHeader(w, r)
 }
 
 func (s *NodeSetMockServer) processAuthHeader(w http.ResponseWriter, r *http.Request) *db.Node {

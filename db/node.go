@@ -6,18 +6,21 @@ import (
 )
 
 type Node struct {
-	Address    common.Address
-	Validators map[string]map[beacon.ValidatorPubkey]*Validator
+	Index              int
+	Address            common.Address
+	Validators         map[string]map[beacon.ValidatorPubkey]*Validator
+	nextValidatorIndex int
 }
 
-func NewNode(address common.Address) *Node {
+func newNode(address common.Address, index int) *Node {
 	return &Node{
+		Index:      index,
 		Address:    address,
 		Validators: map[string]map[beacon.ValidatorPubkey]*Validator{},
 	}
 }
 
-func (n *Node) AddDepositData(depositData beacon.ExtendedDepositData) {
+func (n *Node) AddDepositData(depositData beacon.ExtendedDepositData, vaultAddress common.Address) {
 	dataMap, exists := n.Validators[depositData.NetworkName]
 	if !exists {
 		dataMap = map[beacon.ValidatorPubkey]*Validator{}
@@ -27,14 +30,16 @@ func (n *Node) AddDepositData(depositData beacon.ExtendedDepositData) {
 	pubkey := beacon.ValidatorPubkey(depositData.PublicKey)
 	validator, exists := dataMap[pubkey]
 	if !exists {
-		validator = NewValidator(depositData)
+		validator = newValidator(depositData, n.nextValidatorIndex, vaultAddress)
+		n.nextValidatorIndex++
 	}
 
 	dataMap[pubkey] = validator
 }
 
 func (n *Node) Clone() *Node {
-	clone := NewNode(n.Address)
+	clone := newNode(n.Address, n.Index)
+	clone.nextValidatorIndex = n.nextValidatorIndex
 	for network, dataMap := range n.Validators {
 		validatorMap := map[beacon.ValidatorPubkey]*Validator{}
 		for pubkey, validator := range dataMap {

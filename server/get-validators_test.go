@@ -1,25 +1,22 @@
 package server
 
 import (
+	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/nodeset-org/nodeset-svc-mock/api"
 	"github.com/nodeset-org/nodeset-svc-mock/auth"
 	"github.com/nodeset-org/nodeset-svc-mock/internal/test"
-	"github.com/rocket-pool/node-manager-core/utils"
 	"github.com/stretchr/testify/require"
 )
 
 // Make sure the correct response is returned for a successful request
-func TestDepositDataMeta(t *testing.T) {
-	depositDataSet := 192
-
+func TestGetValidators(t *testing.T) {
 	// Take a snapshot
 	server.manager.TakeSnapshot("test")
 	defer server.manager.RevertToSnapshot("test")
@@ -38,26 +35,27 @@ func TestDepositDataMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error adding node account: %v", err)
 	}
-	err = server.manager.Database.AddStakeWiseVault(test.StakeWiseVaultAddress, test.Network)
-	if err != nil {
-		t.Fatalf("error adding StakeWise vault to database: %v", err)
-	}
-	vault := server.manager.Database.StakeWiseVaults[test.Network][test.StakeWiseVaultAddress]
-	vault.LatestDepositDataSetIndex = depositDataSet
 
+	// Run a get validators request
+	parsedResponse := runGetValidatorsRequest(t, node0Key)
+
+	// Make sure the response is correct
+	require.Empty(t, parsedResponse.Data)
+}
+
+func runGetValidatorsRequest(t *testing.T, nodeKey *ecdsa.PrivateKey) api.ValidatorsResponse {
 	// Create the request
-	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/%s", port, api.DepositDataMetaPath), nil)
+	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/%s", port, api.ValidatorsPath), nil)
 	if err != nil {
 		t.Fatalf("error creating request: %v", err)
 	}
 	query := request.URL.Query()
-	query.Add("vault", utils.RemovePrefix(strings.ToLower(test.StakeWiseVaultAddressHex)))
 	query.Add("network", test.Network)
 	request.URL.RawQuery = query.Encode()
 	t.Logf("Created request")
 
 	// Add the auth header
-	auth.AddAuthorizationHeader(request, node0Key)
+	auth.AddAuthorizationHeader(request, nodeKey)
 	t.Logf("Added auth header")
 
 	// Send the request
@@ -77,13 +75,11 @@ func TestDepositDataMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error reading the response body: %v", err)
 	}
-	var parsedResponse api.DepositDataMetaResponse
+	var parsedResponse api.ValidatorsResponse
 	err = json.Unmarshal(bytes, &parsedResponse)
 	if err != nil {
 		t.Fatalf("error deserializing response: %v", err)
 	}
-
-	// Make sure the response is correct
-	require.Equal(t, depositDataSet, parsedResponse.Version)
-	t.Logf("Received correct response - version = %d", parsedResponse.Version)
+	t.Log("Received response")
+	return parsedResponse
 }

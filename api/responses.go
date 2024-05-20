@@ -37,6 +37,9 @@ type ErrorResponse struct {
 type StakeWiseStatus string
 
 const (
+	// DepositData hasn't been uploaded to NodeSet yet
+	StakeWiseStatus_Unknown StakeWiseStatus = "UNKNOWN"
+
 	// DepositData uploaded to NodeSet, but hasn't been made part of a deposit data set yet
 	StakeWiseStatus_Pending StakeWiseStatus = "PENDING"
 

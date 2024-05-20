@@ -11,7 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/nodeset-org/nodeset-svc-mock/test_utils"
+	"github.com/nodeset-org/nodeset-svc-mock/internal/test"
 	"github.com/rocket-pool/node-manager-core/utils"
 )
 
@@ -23,7 +23,7 @@ func TestRecoverPubkey(t *testing.T) {
 	logger := slog.Default()
 
 	// Get a private key
-	privateKey, err := test_utils.GetEthPrivateKey(0)
+	privateKey, err := test.GetEthPrivateKey(0)
 	if err != nil {
 		t.Fatalf("error getting private key: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestGoodRequest(t *testing.T) {
 	logger := slog.Default()
 
 	// Get a private key
-	privateKey, err := test_utils.GetEthPrivateKey(0)
+	privateKey, err := test.GetEthPrivateKey(0)
 	if err != nil {
 		t.Fatalf("error getting private key: %v", err)
 	}
@@ -69,10 +69,10 @@ func TestGoodRequest(t *testing.T) {
 	t.Logf("Constructed private key, pubkey = %s", pubkey.Hex())
 
 	// Create a request with the proper header
-	vault := utils.RemovePrefix(test_utils.StakeWiseVaultAddressHex)
+	vault := utils.RemovePrefix(test.StakeWiseVaultAddressHex)
 	params := map[string]string{
 		"vault":   vault,
-		"network": test_utils.Network,
+		"network": test.Network,
 	}
 	request, err := generateRequest(privateKey, http.MethodGet, nil, params, "deposit-data", "meta")
 	if err != nil {

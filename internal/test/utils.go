@@ -1,4 +1,4 @@
-package test_utils
+package test
 
 import (
 	"crypto/ecdsa"
@@ -14,22 +14,27 @@ import (
 )
 
 const (
-	EthDerivationPath        string = "m/44'/60'/0'/0/%d"
-	BeaconDerivationPath     string = "m/12381/3600/%d/0/0"
-	Mnemonic                 string = "test test test test test test test test test test test junk"
-	StakeWiseVaultAddressHex string = "0x57ace215eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-	Network                  string = "holesky"
-	GenesisForkVersionString string = "0x01017000"
-	User0Email               string = "user_0@test.com"
-	User1Email               string = "user_1@test.com"
-	User2Email               string = "user_2@test.com"
-	User3Email               string = "user_3@test.com"
-	DepositAmount            uint64 = 32e9
+	EthDerivationPath           string = "m/44'/60'/0'/0/%d"
+	BeaconDerivationPath        string = "m/12381/3600/%d/0/0"
+	Mnemonic                    string = "test test test test test test test test test test test junk"
+	StakeWiseVaultAddressHex    string = "0x57ace215eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+	Network                     string = "holesky"
+	GenesisForkVersionString    string = "0x01017000"
+	CapellaForkVersionString    string = "0x04017000"
+	GenesisValidatorsRootString string = "0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1"
+	User0Email                  string = "user_0@test.com"
+	User1Email                  string = "user_1@test.com"
+	User2Email                  string = "user_2@test.com"
+	User3Email                  string = "user_3@test.com"
+	DepositAmount               uint64 = 32e9
+	ExitEpoch                   uint64 = 100
 )
 
 var (
 	StakeWiseVaultAddress common.Address = common.HexToAddress(StakeWiseVaultAddressHex)
 	GenesisForkVersion    []byte         = common.FromHex(GenesisForkVersionString)
+	CapellaForkVersion    []byte         = common.FromHex(CapellaForkVersionString)
+	GenesisValidatorsRoot []byte         = common.FromHex(GenesisValidatorsRootString)
 )
 
 // Get the EL private key for the given index
