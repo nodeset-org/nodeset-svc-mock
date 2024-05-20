@@ -28,6 +28,7 @@ func NewNodeSetMockManager(logger *slog.Logger) *NodeSetMockManager {
 
 func (m *NodeSetMockManager) TakeSnapshot(name string) {
 	m.snapshots[name] = m.Database.Clone()
+	m.logger.Info("Took DB snapshot", "name", name)
 }
 
 func (m *NodeSetMockManager) RevertToSnapshot(name string) error {
@@ -36,5 +37,6 @@ func (m *NodeSetMockManager) RevertToSnapshot(name string) error {
 		return fmt.Errorf("snapshot with name [%s] does not exist", name)
 	}
 	m.Database = snapshot
+	m.logger.Info("Reverted to DB snapshot", "name", name)
 	return nil
 }

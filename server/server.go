@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -93,6 +95,16 @@ func (s *NodeSetMockServer) GetPort() uint16 {
 // Register all of the routes
 func (s *NodeSetMockServer) registerRoutes(nmcRouter *mux.Router) {
 	nmcRouter.HandleFunc("/"+api.DepositDataMetaPath, s.depositDataMeta)
+	nmcRouter.HandleFunc("/"+api.DepositDataPath, func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			s.getDepositData(w, r)
+		case http.MethodPost:
+			s.uploadDepositData(w, r)
+		default:
+			handleInvalidMethod(s.logger, w)
+		}
+	})
 }
 
 // =============
@@ -111,6 +123,33 @@ func (s *NodeSetMockServer) processGet(w http.ResponseWriter, r *http.Request) (
 	}
 
 	return s.processAuthHeader(w, r), args
+}
+
+func (s *NodeSetMockServer) processPost(w http.ResponseWriter, r *http.Request, requestBody any) *db.Node {
+	s.logger.Info("New request", slog.String(log.MethodKey, r.Method), slog.String(log.PathKey, r.URL.Path))
+
+	// Check the method
+	if r.Method != http.MethodPost {
+		handleInvalidMethod(s.logger, w)
+		return nil
+	}
+
+	// Read the body
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		handleInputError(s.logger, w, fmt.Errorf("error reading request body: %w", err))
+		return nil
+	}
+	s.logger.Debug("Request body:", slog.String(log.BodyKey, string(bodyBytes)))
+
+	// Deserialize the body
+	err = json.Unmarshal(bodyBytes, &requestBody)
+	if err != nil {
+		handleInputError(s.logger, w, fmt.Errorf("error deserializing request body: %w", err))
+		return nil
+	}
+
+	return s.processAuthHeader(w, r)
 }
 
 func (s *NodeSetMockServer) processAuthHeader(w http.ResponseWriter, r *http.Request) *db.Node {

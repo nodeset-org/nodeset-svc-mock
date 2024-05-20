@@ -17,8 +17,11 @@ type Database struct {
 	// Collection of users
 	Users map[string]*User
 
+	// Index of the latest deposit data set uploaded to StakeWise
+	LatestDepositDataSetIndex int
+
 	// Latest deposit data set uploaded to StakeWise
-	LatestDepositDataSet int
+	LatestDepositDataSet []beacon.ExtendedDepositData
 
 	// Internal fields
 	logger *slog.Logger
@@ -27,9 +30,11 @@ type Database struct {
 // Creates a new database
 func NewDatabase(logger *slog.Logger) *Database {
 	return &Database{
-		StakeWiseVaults: map[string]map[common.Address]*StakeWiseVault{},
-		Users:           map[string]*User{},
-		logger:          logger,
+		StakeWiseVaults:           map[string]map[common.Address]*StakeWiseVault{},
+		Users:                     map[string]*User{},
+		LatestDepositDataSet:      []beacon.ExtendedDepositData{},
+		LatestDepositDataSetIndex: 0,
+		logger:                    logger,
 	}
 }
 
@@ -77,7 +82,9 @@ func (d *Database) AddNodeAccount(email string, nodeAddress common.Address) erro
 // Clones the database
 func (d *Database) Clone() *Database {
 	clone := NewDatabase(d.logger)
-	clone.LatestDepositDataSet = d.LatestDepositDataSet
+	clone.LatestDepositDataSetIndex = d.LatestDepositDataSetIndex
+	clone.LatestDepositDataSet = make([]beacon.ExtendedDepositData, len(d.LatestDepositDataSet))
+	copy(clone.LatestDepositDataSet, d.LatestDepositDataSet)
 
 	// Copy StakeWise vaults
 	for network, vaults := range d.StakeWiseVaults {
@@ -179,6 +186,34 @@ func (d *Database) HandleSignedExitUpload(nodeAddress common.Address, network st
 	return nil
 }
 
+// Create a new deposit data set
+func (d *Database) CreateNewDepositDataSet(network string, validatorsPerUser int) []beacon.ExtendedDepositData {
+	depositData := []beacon.ExtendedDepositData{}
+	for _, user := range d.Users {
+		userCount := 0
+		for _, node := range user.Nodes {
+			validators, exists := node.Validators[network]
+			if !exists {
+				continue
+			}
+			for _, validator := range validators {
+				if !validator.DepositDataUsed {
+					depositData = append(depositData, validator.DepositData)
+					userCount++
+					if userCount >= validatorsPerUser {
+						break
+					}
+				}
+			}
+			if userCount >= validatorsPerUser {
+				break
+			}
+		}
+	}
+	return depositData
+}
+
+// Call this to "upload" a deposit data set to StakeWise
 func (d *Database) UploadDepositDataToStakeWise(vaultAddress common.Address, network string, data []beacon.ExtendedDepositData) error {
 	vault, exists := d.StakeWiseVaults[network][vaultAddress]
 	if !exists {
@@ -190,4 +225,30 @@ func (d *Database) UploadDepositDataToStakeWise(vaultAddress common.Address, net
 		vault.MarkDepositDataUploaded(pubkey)
 	}
 	return nil
+}
+
+// Call this once a deposit data set has been "uploaded" to StakeWise
+func (d *Database) MarkDepositDataSetUploaded(data []beacon.ExtendedDepositData) {
+	// Flag each deposit data as uploaded
+	for _, depositData := range data {
+		network := depositData.NetworkName
+		for _, user := range d.Users {
+			for _, node := range user.Nodes {
+				validators, exists := node.Validators[network]
+				if !exists {
+					continue
+				}
+				for _, validator := range validators {
+					if validator.Pubkey == beacon.ValidatorPubkey(depositData.PublicKey) {
+						validator.DepositData = depositData
+						validator.UseDepositData()
+					}
+				}
+			}
+		}
+	}
+
+	// Increment the index
+	d.LatestDepositDataSet = data
+	d.LatestDepositDataSetIndex++
 }

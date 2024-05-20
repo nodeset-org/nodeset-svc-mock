@@ -23,7 +23,7 @@ func TestRecoverPubkey(t *testing.T) {
 	logger := slog.Default()
 
 	// Get a private key
-	privateKey, err := test_utils.GetPrivateKey(0)
+	privateKey, err := test_utils.GetEthPrivateKey(0)
 	if err != nil {
 		t.Fatalf("error getting private key: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestGoodRequest(t *testing.T) {
 	logger := slog.Default()
 
 	// Get a private key
-	privateKey, err := test_utils.GetPrivateKey(0)
+	privateKey, err := test_utils.GetEthPrivateKey(0)
 	if err != nil {
 		t.Fatalf("error getting private key: %v", err)
 	}

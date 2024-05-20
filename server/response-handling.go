@@ -16,6 +16,13 @@ func handleInvalidMethod(logger *slog.Logger, w http.ResponseWriter) {
 	writeResponse(w, logger, http.StatusMethodNotAllowed, []byte{})
 }
 
+// Handles an error related to parsing the input parameters of a request
+func handleInputError(logger *slog.Logger, w http.ResponseWriter, err error) {
+	msg := err.Error()
+	bytes := formatError(msg)
+	writeResponse(w, logger, http.StatusBadRequest, bytes)
+}
+
 // Write an error if the auth header couldn't be decoded
 func handleAuthHeaderError(w http.ResponseWriter, logger *slog.Logger, err error) {
 	msg := err.Error()
@@ -46,10 +53,14 @@ func handleServerError(w http.ResponseWriter, logger *slog.Logger, err error) {
 
 // The request completed successfully
 func handleSuccess(w http.ResponseWriter, logger *slog.Logger, message any) {
-	// Serialize the response
-	bytes, err := json.Marshal(message)
-	if err != nil {
-		handleServerError(w, logger, fmt.Errorf("error serializing response: %w", err))
+	bytes := []byte{}
+	if message != nil {
+		// Serialize the response
+		var err error
+		bytes, err = json.Marshal(message)
+		if err != nil {
+			handleServerError(w, logger, fmt.Errorf("error serializing response: %w", err))
+		}
 	}
 
 	// Write it

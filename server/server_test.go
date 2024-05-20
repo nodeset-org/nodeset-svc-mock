@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
 	"testing"
 
@@ -13,24 +14,67 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Check for a 404 if requesting an unknown route
-func TestUnknownRoute(t *testing.T) {
+// Various singleton variables used for testing
+var (
+	logger *slog.Logger       = slog.Default()
+	server *NodeSetMockServer = nil
+	wg     *sync.WaitGroup    = nil
+	port   uint16             = 0
+)
+
+// Initialize a common server used by all tests
+func TestMain(m *testing.M) {
 	// Create the server
-	logger := slog.Default()
-	server, err := NewNodeSetMockServer(logger, "localhost", 0)
+	var err error
+	server, err = NewNodeSetMockServer(logger, "localhost", 0)
 	if err != nil {
-		t.Fatalf("error creating server: %v", err)
+		fail("error creating server: %v", err)
 	}
-	t.Log("Created server")
+	logger.Info("Created server")
 
 	// Start it
-	wg := &sync.WaitGroup{}
+	wg = &sync.WaitGroup{}
 	err = server.Start(wg)
 	if err != nil {
-		t.Fatalf("error starting server: %v", err)
+		fail("error starting server: %v", err)
 	}
-	port := server.GetPort()
-	t.Logf("Started server on port %d", port)
+	port = server.GetPort()
+	logger.Info(fmt.Sprintf("Started server on port %d", port))
+
+	// Run tests
+	code := m.Run()
+
+	// Revert to the baseline after testing is done
+	cleanup()
+
+	// Done
+	os.Exit(code)
+}
+
+func fail(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	logger.Error(msg)
+	cleanup()
+	os.Exit(1)
+}
+
+func cleanup() {
+	if server != nil {
+		_ = server.Stop()
+		wg.Wait()
+		logger.Info("Stopped server")
+	}
+}
+
+// =============
+// === Tests ===
+// =============
+
+// Check for a 404 if requesting an unknown route
+func TestUnknownRoute(t *testing.T) {
+	// Take a snapshot
+	server.manager.TakeSnapshot("test")
+	defer server.manager.RevertToSnapshot("test")
 
 	// Send a message without an auth header
 	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/unknown_route", port), nil)
@@ -49,31 +93,13 @@ func TestUnknownRoute(t *testing.T) {
 	// Check the response
 	require.Equal(t, http.StatusNotFound, response.StatusCode)
 	t.Logf("Received not found status code")
-
-	// Stop the server
-	server.Stop()
-	wg.Wait()
-	t.Log("Stopped server")
 }
 
 // Check for a 401 if the auth header's missing
 func TestMissingHeader(t *testing.T) {
-	// Create the server
-	logger := slog.Default()
-	server, err := NewNodeSetMockServer(logger, "localhost", 0)
-	if err != nil {
-		t.Fatalf("error creating server: %v", err)
-	}
-	t.Log("Created server")
-
-	// Start it
-	wg := &sync.WaitGroup{}
-	err = server.Start(wg)
-	if err != nil {
-		t.Fatalf("error starting server: %v", err)
-	}
-	port := server.GetPort()
-	t.Logf("Started server on port %d", port)
+	// Take a snapshot
+	server.manager.TakeSnapshot("test")
+	defer server.manager.RevertToSnapshot("test")
 
 	// Send a message without an auth header
 	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/%s", port, api.DepositDataMetaPath), nil)
@@ -92,31 +118,13 @@ func TestMissingHeader(t *testing.T) {
 	// Check the response
 	require.Equal(t, http.StatusUnauthorized, response.StatusCode)
 	t.Logf("Received unauthorized status code")
-
-	// Stop the server
-	server.Stop()
-	wg.Wait()
-	t.Log("Stopped server")
 }
 
 // Check for a 401 if the node isn't registered
 func TestUnregisteredNode(t *testing.T) {
-	// Create the server
-	logger := slog.Default()
-	server, err := NewNodeSetMockServer(logger, "localhost", 0)
-	if err != nil {
-		t.Fatalf("error creating server: %v", err)
-	}
-	t.Log("Created server")
-
-	// Start it
-	wg := &sync.WaitGroup{}
-	err = server.Start(wg)
-	if err != nil {
-		t.Fatalf("error starting server: %v", err)
-	}
-	port := server.GetPort()
-	t.Logf("Started server on port %d", port)
+	// Take a snapshot
+	server.manager.TakeSnapshot("test")
+	defer server.manager.RevertToSnapshot("test")
 
 	// Send a message without an auth header
 	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/%s", port, api.DepositDataMetaPath), nil)
@@ -126,7 +134,7 @@ func TestUnregisteredNode(t *testing.T) {
 	t.Logf("Created request")
 
 	// Add an auth header
-	node0Key, err := test_utils.GetPrivateKey(0)
+	node0Key, err := test_utils.GetEthPrivateKey(0)
 	if err != nil {
 		t.Fatalf("error getting private key: %v", err)
 	}
@@ -143,9 +151,4 @@ func TestUnregisteredNode(t *testing.T) {
 	// Check the response
 	require.Equal(t, http.StatusUnauthorized, response.StatusCode)
 	t.Logf("Received unauthorized status code")
-
-	// Stop the server
-	server.Stop()
-	wg.Wait()
-	t.Log("Stopped server")
 }

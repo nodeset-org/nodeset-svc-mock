@@ -4,15 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
-	"sync"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/nodeset-org/nodeset-svc-mock/api"
 	"github.com/nodeset-org/nodeset-svc-mock/auth"
-	"github.com/nodeset-org/nodeset-svc-mock/db"
 	"github.com/nodeset-org/nodeset-svc-mock/test_utils"
 	"github.com/stretchr/testify/require"
 )
@@ -21,35 +18,25 @@ import (
 func TestDepositDataMeta(t *testing.T) {
 	depositDataSet := 192
 
-	// Create the server
-	logger := slog.Default()
-	server, err := NewNodeSetMockServer(logger, "localhost", 0)
-	if err != nil {
-		t.Fatalf("error creating server: %v", err)
-	}
-	t.Log("Created server")
-
-	// Start it
-	wg := &sync.WaitGroup{}
-	err = server.Start(wg)
-	if err != nil {
-		t.Fatalf("error starting server: %v", err)
-	}
-	port := server.GetPort()
-	t.Logf("Started server on port %d", port)
+	// Take a snapshot
+	server.manager.TakeSnapshot("test")
+	defer server.manager.RevertToSnapshot("test")
 
 	// Provision the database
-	node0Key, err := test_utils.GetPrivateKey(0)
+	node0Key, err := test_utils.GetEthPrivateKey(0)
 	if err != nil {
 		t.Fatalf("error getting private key: %v", err)
 	}
 	node0Pubkey := crypto.PubkeyToAddress(node0Key.PublicKey)
-	server.manager.Database.Users[test_utils.UserEmail] = db.NewUser(test_utils.UserEmail)
-	err = server.manager.Database.AddNodeAccount(test_utils.UserEmail, node0Pubkey)
+	err = server.manager.Database.AddUser(test_utils.User0Email)
+	if err != nil {
+		t.Fatalf("error adding user: %v", err)
+	}
+	err = server.manager.Database.AddNodeAccount(test_utils.User0Email, node0Pubkey)
 	if err != nil {
 		t.Fatalf("error adding node account: %v", err)
 	}
-	server.manager.Database.LatestDepositDataSet = depositDataSet
+	server.manager.Database.LatestDepositDataSetIndex = depositDataSet
 
 	// Send a message without an auth header
 	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/%s", port, api.DepositDataMetaPath), nil)
@@ -88,9 +75,4 @@ func TestDepositDataMeta(t *testing.T) {
 	// Make sure the response is correct
 	require.Equal(t, depositDataSet, parsedResponse.Version)
 	t.Logf("Received correct response - version = %d", parsedResponse.Version)
-
-	// Stop the server
-	server.Stop()
-	wg.Wait()
-	t.Log("Stopped server")
 }
