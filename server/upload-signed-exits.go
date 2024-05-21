@@ -9,7 +9,7 @@ import (
 func (s *NodeSetMockServer) uploadSignedExits(w http.ResponseWriter, r *http.Request) {
 	// Get the requesting node
 	var exitData []api.ExitData
-	node, args := s.processRequest(w, r, &exitData)
+	node, args := s.processApiRequest(w, r, &exitData)
 	if node == nil {
 		return
 	}

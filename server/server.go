@@ -19,11 +19,6 @@ import (
 	"github.com/rocket-pool/node-manager-core/log"
 )
 
-const (
-	adminSnapshotPath = "/snapshot"
-	adminRevertPath   = "/revert"
-)
-
 type NodeSetMockServer struct {
 	logger  *slog.Logger
 	ip      string
@@ -99,7 +94,7 @@ func (s *NodeSetMockServer) GetPort() uint16 {
 	return s.port
 }
 
-// Register all of the API routes
+// API routes
 func (s *NodeSetMockServer) registerApiRoutes(apiRouter *mux.Router) {
 	apiRouter.HandleFunc("/"+api.DepositDataMetaPath, func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -131,39 +126,18 @@ func (s *NodeSetMockServer) registerApiRoutes(apiRouter *mux.Router) {
 	})
 }
 
-// Admin routes for snapshotting
+// Admin routes
 func (s *NodeSetMockServer) registerAdminRoutes(adminRouter *mux.Router) {
-	adminRouter.HandleFunc(adminSnapshotPath, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			handleInvalidMethod(s.logger, w)
-			return
-		}
-
-		snapshotName := r.URL.Query().Get("name")
-		s.manager.TakeSnapshot(snapshotName)
-		handleSuccess(w, s.logger, "")
-	})
-	adminRouter.HandleFunc(adminRevertPath, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			handleInvalidMethod(s.logger, w)
-			return
-		}
-
-		snapshotName := r.URL.Query().Get("name")
-		err := s.manager.RevertToSnapshot(snapshotName)
-		if err != nil {
-			handleServerError(w, s.logger, err)
-			return
-		}
-		handleSuccess(w, s.logger, "")
-	})
+	adminRouter.HandleFunc("/"+api.AdminSnapshotPath, s.snapshot)
+	adminRouter.HandleFunc("/"+api.AdminRevertPath, s.revert)
+	adminRouter.HandleFunc("/"+api.AdminCycleSetPath, s.cycleSet)
 }
 
 // =============
 // === Utils ===
 // =============
 
-func (s *NodeSetMockServer) processRequest(w http.ResponseWriter, r *http.Request, requestBody any) (*db.Node, url.Values) {
+func (s *NodeSetMockServer) processApiRequest(w http.ResponseWriter, r *http.Request, requestBody any) (*db.Node, url.Values) {
 	args := r.URL.Query()
 	s.logger.Info("New request", slog.String(log.MethodKey, r.Method), slog.String(log.PathKey, r.URL.Path))
 	s.logger.Debug("Request params:", slog.String(log.QueryKey, r.URL.RawQuery))
@@ -186,6 +160,31 @@ func (s *NodeSetMockServer) processRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	return s.processAuthHeader(w, r), args
+}
+
+func (s *NodeSetMockServer) processAdminRequest(w http.ResponseWriter, r *http.Request, requestBody any) url.Values {
+	args := r.URL.Query()
+	s.logger.Info("New request", slog.String(log.MethodKey, r.Method), slog.String(log.PathKey, r.URL.Path))
+	s.logger.Debug("Request params:", slog.String(log.QueryKey, r.URL.RawQuery))
+
+	if requestBody != nil {
+		// Read the body
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			handleInputError(s.logger, w, fmt.Errorf("error reading request body: %w", err))
+			return nil
+		}
+		s.logger.Debug("Request body:", slog.String(log.BodyKey, string(bodyBytes)))
+
+		// Deserialize the body
+		err = json.Unmarshal(bodyBytes, &requestBody)
+		if err != nil {
+			handleInputError(s.logger, w, fmt.Errorf("error deserializing request body: %w", err))
+			return nil
+		}
+	}
+
+	return args
 }
 
 func (s *NodeSetMockServer) processAuthHeader(w http.ResponseWriter, r *http.Request) *db.Node {

@@ -9,7 +9,7 @@ import (
 func (s *NodeSetMockServer) uploadDepositData(w http.ResponseWriter, r *http.Request) {
 	// Get the requesting node
 	var depositData []beacon.ExtendedDepositData
-	node, _ := s.processRequest(w, r, &depositData)
+	node, _ := s.processApiRequest(w, r, &depositData)
 	if node == nil {
 		return
 	}

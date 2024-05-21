@@ -11,7 +11,7 @@ import (
 
 func (s *NodeSetMockServer) getDepositData(w http.ResponseWriter, r *http.Request) {
 	// Get the requesting node
-	node, args := s.processRequest(w, r, nil)
+	node, args := s.processApiRequest(w, r, nil)
 	if node == nil {
 		return
 	}
