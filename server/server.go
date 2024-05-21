@@ -131,6 +131,9 @@ func (s *NodeSetMockServer) registerAdminRoutes(adminRouter *mux.Router) {
 	adminRouter.HandleFunc("/"+api.AdminSnapshotPath, s.snapshot)
 	adminRouter.HandleFunc("/"+api.AdminRevertPath, s.revert)
 	adminRouter.HandleFunc("/"+api.AdminCycleSetPath, s.cycleSet)
+	adminRouter.HandleFunc("/"+api.AdminAddUserPath, s.addUser)
+	adminRouter.HandleFunc("/"+api.AdminAddNodePath, s.addNode)
+	adminRouter.HandleFunc("/"+api.AdminAddVaultPath, s.addStakeWiseVault)
 }
 
 // =============
@@ -160,31 +163,6 @@ func (s *NodeSetMockServer) processApiRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	return s.processAuthHeader(w, r), args
-}
-
-func (s *NodeSetMockServer) processAdminRequest(w http.ResponseWriter, r *http.Request, requestBody any) url.Values {
-	args := r.URL.Query()
-	s.logger.Info("New request", slog.String(log.MethodKey, r.Method), slog.String(log.PathKey, r.URL.Path))
-	s.logger.Debug("Request params:", slog.String(log.QueryKey, r.URL.RawQuery))
-
-	if requestBody != nil {
-		// Read the body
-		bodyBytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			handleInputError(s.logger, w, fmt.Errorf("error reading request body: %w", err))
-			return nil
-		}
-		s.logger.Debug("Request body:", slog.String(log.BodyKey, string(bodyBytes)))
-
-		// Deserialize the body
-		err = json.Unmarshal(bodyBytes, &requestBody)
-		if err != nil {
-			handleInputError(s.logger, w, fmt.Errorf("error deserializing request body: %w", err))
-			return nil
-		}
-	}
-
-	return args
 }
 
 func (s *NodeSetMockServer) processAuthHeader(w http.ResponseWriter, r *http.Request) *db.Node {

@@ -2,12 +2,15 @@ package api
 
 const (
 	// API routes
-	DepositDataMetaPath = "deposit-data/meta"
-	DepositDataPath     = "deposit-data"
-	ValidatorsPath      = "validators"
+	DepositDataMetaPath string = "deposit-data/meta"
+	DepositDataPath     string = "deposit-data"
+	ValidatorsPath      string = "validators"
 
 	// Admin routes
-	AdminSnapshotPath = "snapshot"
-	AdminRevertPath   = "revert"
-	AdminCycleSetPath = "cycle-set"
+	AdminSnapshotPath string = "snapshot"
+	AdminRevertPath   string = "revert"
+	AdminCycleSetPath string = "cycle-set"
+	AdminAddUserPath  string = "add-user"
+	AdminAddNodePath  string = "add-node"
+	AdminAddVaultPath string = "add-vault"
 )
