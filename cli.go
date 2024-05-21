@@ -55,7 +55,9 @@ func main() {
 
 		// Create the server
 		var err error
-		server, err := server.NewNodeSetMockServer(logger, "localhost", 0)
+		ip := c.String(ipFlag.Name)
+		port := uint16(c.Uint(portFlag.Name))
+		server, err := server.NewNodeSetMockServer(logger, ip, port)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating server: %v", err)
 			os.Exit(1)
@@ -68,7 +70,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error starting server: %v", err)
 			os.Exit(1)
 		}
-		port := server.GetPort()
+		port = server.GetPort()
 
 		// Handle process closures
 		termListener := make(chan os.Signal, 1)
@@ -80,7 +82,7 @@ func main() {
 		}()
 
 		// Run the daemon until closed
-		logger.Info(fmt.Sprintf("Started nodeset.io mock server on port %d", port))
+		logger.Info(fmt.Sprintf("Started nodeset.io mock server on %s:%d", ip, port))
 		wg.Wait()
 		fmt.Println("Server stopped.")
 		return nil
