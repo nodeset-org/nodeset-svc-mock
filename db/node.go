@@ -6,46 +6,45 @@ import (
 )
 
 type Node struct {
-	Index              int
-	Address            common.Address
-	Validators         map[string]map[beacon.ValidatorPubkey]*Validator
-	nextValidatorIndex int
+	Address    common.Address
+	Validators map[string][]*Validator
 }
 
-func newNode(address common.Address, index int) *Node {
+func newNode(address common.Address) *Node {
 	return &Node{
-		Index:      index,
 		Address:    address,
-		Validators: map[string]map[beacon.ValidatorPubkey]*Validator{},
+		Validators: map[string][]*Validator{},
 	}
 }
 
 func (n *Node) AddDepositData(depositData beacon.ExtendedDepositData, vaultAddress common.Address) {
-	dataMap, exists := n.Validators[depositData.NetworkName]
+	validatorsForNetwork, exists := n.Validators[depositData.NetworkName]
 	if !exists {
-		dataMap = map[beacon.ValidatorPubkey]*Validator{}
-		n.Validators[depositData.NetworkName] = dataMap
+		validatorsForNetwork = []*Validator{}
+		n.Validators[depositData.NetworkName] = validatorsForNetwork
 	}
 
 	pubkey := beacon.ValidatorPubkey(depositData.PublicKey)
-	validator, exists := dataMap[pubkey]
-	if !exists {
-		validator = newValidator(depositData, n.nextValidatorIndex, vaultAddress)
-		n.nextValidatorIndex++
+	for _, validator := range validatorsForNetwork {
+		if validator.Pubkey == pubkey {
+			// Already present
+			return
+		}
 	}
 
-	dataMap[pubkey] = validator
+	validator := newValidator(depositData, vaultAddress)
+	validatorsForNetwork = append(validatorsForNetwork, validator)
+	n.Validators[depositData.NetworkName] = validatorsForNetwork
 }
 
 func (n *Node) Clone() *Node {
-	clone := newNode(n.Address, n.Index)
-	clone.nextValidatorIndex = n.nextValidatorIndex
-	for network, dataMap := range n.Validators {
-		validatorMap := map[beacon.ValidatorPubkey]*Validator{}
-		for pubkey, validator := range dataMap {
-			validatorMap[pubkey] = validator.Clone()
+	clone := newNode(n.Address)
+	for network, validatorsForNetwork := range n.Validators {
+		cloneSlice := make([]*Validator, len(validatorsForNetwork))
+		for i, validator := range validatorsForNetwork {
+			cloneSlice[i] = validator.Clone()
 		}
-		clone.Validators[network] = validatorMap
+		clone.Validators[network] = cloneSlice
 	}
 	return clone
 }

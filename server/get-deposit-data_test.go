@@ -30,7 +30,7 @@ func TestGetDepositData(t *testing.T) {
 	parsedResponse := runGetDepositDataRequest(t)
 
 	// Make sure the response is correct
-	vault := db.StakeWiseVaults[test.Network][test.StakeWiseVaultAddress]
+	vault := db.StakeWiseVaults[test.Network][0]
 	require.Equal(t, vault.LatestDepositDataSetIndex, parsedResponse.Version)
 	require.Equal(t, vault.LatestDepositDataSet, parsedResponse.Data)
 	require.Greater(t, len(parsedResponse.Data), 0)

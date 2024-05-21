@@ -42,7 +42,7 @@ func TestDepositDataMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error adding StakeWise vault to database: %v", err)
 	}
-	vault := server.manager.Database.StakeWiseVaults[test.Network][test.StakeWiseVaultAddress]
+	vault := server.manager.Database.StakeWiseVaults[test.Network][0]
 	vault.LatestDepositDataSetIndex = depositDataSet
 
 	// Create the request

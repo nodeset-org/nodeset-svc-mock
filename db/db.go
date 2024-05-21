@@ -3,7 +3,6 @@ package db
 import (
 	"fmt"
 	"log/slog"
-	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/nodeset-org/nodeset-svc-mock/api"
@@ -13,51 +12,54 @@ import (
 // Mock database for storing nodeset.io info
 type Database struct {
 	// Collection of StakeWise vaults
-	StakeWiseVaults map[string]map[common.Address]*StakeWiseVault
+	StakeWiseVaults map[string][]*StakeWiseVault
 
 	// Collection of users
-	Users map[string]*User
+	Users []*User
 
 	// Internal fields
-	logger        *slog.Logger
-	nextUserIndex int
+	logger *slog.Logger
 }
 
 // Creates a new database
 func NewDatabase(logger *slog.Logger) *Database {
 	return &Database{
-		StakeWiseVaults: map[string]map[common.Address]*StakeWiseVault{},
-		Users:           map[string]*User{},
+		StakeWiseVaults: map[string][]*StakeWiseVault{},
+		Users:           []*User{},
 		logger:          logger,
 	}
 }
 
 // Adds a StakeWise vault to the database
 func (d *Database) AddStakeWiseVault(address common.Address, networkName string) error {
-	network, exists := d.StakeWiseVaults[networkName]
+	networkVaults, exists := d.StakeWiseVaults[networkName]
 	if !exists {
-		network = map[common.Address]*StakeWiseVault{}
-		d.StakeWiseVaults[networkName] = network
+		networkVaults = []*StakeWiseVault{}
+		d.StakeWiseVaults[networkName] = networkVaults
 	}
 
-	if _, exists := network[address]; exists {
-		return fmt.Errorf("stakewise vault with address [%s] already exists", address.Hex())
+	for _, vault := range networkVaults {
+		if vault.Address == address {
+			return fmt.Errorf("stakewise vault with address [%s] already exists", address.Hex())
+		}
 	}
 
 	vault := NewStakeWiseVaultInfo(address)
-	network[address] = vault
+	networkVaults = append(networkVaults, vault)
+	d.StakeWiseVaults[networkName] = networkVaults
 	return nil
 }
 
 // Adds a user to the database
 func (d *Database) AddUser(email string) error {
-	if _, exists := d.Users[email]; exists {
-		return fmt.Errorf("user with email [%s] already exists", email)
+	for _, user := range d.Users {
+		if user.Email == email {
+			return fmt.Errorf("user with email [%s] already exists", email)
+		}
 	}
 
-	user := newUser(email, d.nextUserIndex)
-	d.Users[email] = user
-	d.nextUserIndex++
+	user := newUser(email)
+	d.Users = append(d.Users, user)
 	return nil
 }
 
@@ -77,20 +79,22 @@ func (d *Database) AddNodeAccount(email string, nodeAddress common.Address) erro
 // Clones the database
 func (d *Database) Clone() *Database {
 	clone := NewDatabase(d.logger)
-	clone.nextUserIndex = d.nextUserIndex
 
 	// Copy StakeWise vaults
 	for network, vaults := range d.StakeWiseVaults {
-		for address, vault := range vaults {
-			clone.AddStakeWiseVault(address, network)
-			clone.StakeWiseVaults[network][address] = vault.Clone()
+		for _, vault := range vaults {
+			clone.AddStakeWiseVault(vault.Address, network)
+			networkVaults := make([]*StakeWiseVault, len(vaults))
+			for i, vault := range vaults {
+				networkVaults[i] = vault.Clone()
+			}
+			clone.StakeWiseVaults[network] = networkVaults
 		}
 	}
 
 	// Copy users
-	for email, user := range d.Users {
-		clone.AddUser(email)
-		clone.Users[email] = user.Clone()
+	for _, user := range d.Users {
+		clone.Users = append(clone.Users, user.Clone())
 	}
 	return clone
 }
@@ -101,8 +105,8 @@ func (d *Database) Clone() *Database {
 
 func (d *Database) GetNode(address common.Address) *Node {
 	for _, user := range d.Users {
-		for candidateAddress, candidate := range user.Nodes {
-			if candidateAddress == address {
+		for _, candidate := range user.Nodes {
+			if candidate.Address == address {
 				return candidate
 			}
 		}
@@ -125,10 +129,11 @@ func (d *Database) GetValidatorStatus(network string, pubkey beacon.ValidatorPub
 			if !exists {
 				continue
 			}
-			candidate, exists := validators[pubkey]
-			if exists {
-				validator = candidate
-				break
+			for _, candidate := range validators {
+				if candidate.Pubkey == pubkey {
+					validator = candidate
+					break
+				}
 			}
 		}
 		if validator != nil {
@@ -140,9 +145,10 @@ func (d *Database) GetValidatorStatus(network string, pubkey beacon.ValidatorPub
 	}
 
 	// Check if the StakeWise vault has already seen it
-	uploadedToStakewise := vaults[validator.VaultAddress].UploadedData[validator.Pubkey]
-	if uploadedToStakewise {
-		return api.StakeWiseStatus_Uploaded
+	for _, vault := range vaults {
+		if vault.Address == validator.VaultAddress && vault.UploadedData[validator.Pubkey] {
+			return api.StakeWiseStatus_Uploaded
+		}
 	}
 
 	// Check to see if the deposit data has been used
@@ -159,8 +165,8 @@ func (d *Database) HandleDepositDataUpload(nodeAddress common.Address, data []be
 	// Get the node
 	var node *Node
 	for _, user := range d.Users {
-		for candidateAddress, candidate := range user.Nodes {
-			if candidateAddress == nodeAddress {
+		for _, candidate := range user.Nodes {
+			if candidate.Address == nodeAddress {
 				node = candidate
 				break
 			}
@@ -180,12 +186,17 @@ func (d *Database) HandleDepositDataUpload(nodeAddress common.Address, data []be
 		if !exists {
 			return fmt.Errorf("network [%s] not found in StakeWise vaults", depositData.NetworkName)
 		}
-		_, exists = vaults[vaultAddress]
-		if !exists {
+		found := false
+		for _, vault := range vaults {
+			if vault.Address == vaultAddress {
+				found = true
+				node.AddDepositData(depositData, vaultAddress)
+				break
+			}
+		}
+		if !found {
 			return fmt.Errorf("vault with address [%s] not found", vaultAddress.Hex())
 		}
-
-		node.AddDepositData(depositData, vaultAddress)
 	}
 
 	return nil
@@ -196,8 +207,8 @@ func (d *Database) HandleSignedExitUpload(nodeAddress common.Address, network st
 	// Get the node
 	var node *Node
 	for _, user := range d.Users {
-		for candidateAddress, candidate := range user.Nodes {
-			if candidateAddress == nodeAddress {
+		for _, candidate := range user.Nodes {
+			if candidate.Address == nodeAddress {
 				node = candidate
 				break
 			}
@@ -218,16 +229,22 @@ func (d *Database) HandleSignedExitUpload(nodeAddress common.Address, network st
 		}
 
 		// Get the validator
-		validatorMap, exists := node.Validators[network]
+		validators, exists := node.Validators[network]
 		if !exists {
 			return fmt.Errorf("network [%s] is not used by node [%s]", network, nodeAddress.Hex())
 		}
-		validator, exists := validatorMap[pubkey]
-		if !exists {
+		found := false
+		for _, validator := range validators {
+			if validator.Pubkey == pubkey {
+				validator.SetExitMessage(signedExit.ExitMessage)
+				found = true
+				break
+			}
+		}
+		if !found {
 			return fmt.Errorf("node [%s] doesn't have validator [%s]", nodeAddress.Hex(), pubkey.Hex())
 		}
 
-		validator.SetExitMessage(signedExit.ExitMessage)
 	}
 	return nil
 }
@@ -236,40 +253,15 @@ func (d *Database) HandleSignedExitUpload(nodeAddress common.Address, network st
 func (d *Database) CreateNewDepositDataSet(network string, validatorsPerUser int) []beacon.ExtendedDepositData {
 	depositData := []beacon.ExtendedDepositData{}
 
-	// Iterate the users, sorted by index
-	users := make([]*User, 0, len(d.Users))
+	// Iterate the users
 	for _, user := range d.Users {
-		users = append(users, user)
-	}
-	sort.SliceStable(users, func(i int, j int) bool {
-		return users[i].Index < users[j].Index
-	})
-	for _, user := range users {
 		userCount := 0
-
-		// Iterate the nodes, sorted by index
-		nodes := make([]*Node, 0, len(user.Nodes))
 		for _, node := range user.Nodes {
-			nodes = append(nodes, node)
-		}
-		sort.SliceStable(nodes, func(i int, j int) bool {
-			return nodes[i].Index < nodes[j].Index
-		})
-		for _, node := range nodes {
 			validatorsForNetwork, exists := node.Validators[network]
 			if !exists {
 				continue
 			}
-
-			// Iterate the validators, sorted by index
-			validators := make([]*Validator, 0, len(validatorsForNetwork))
 			for _, validator := range validatorsForNetwork {
-				validators = append(validators, validator)
-			}
-			sort.SliceStable(validators, func(i int, j int) bool {
-				return validators[i].Index < validators[j].Index
-			})
-			for _, validator := range validators {
 				// Add this deposit data if it hasn't been used
 				if !validator.DepositDataUsed {
 					depositData = append(depositData, validator.DepositData)
@@ -294,8 +286,14 @@ func (d *Database) UploadDepositDataToStakeWise(vaultAddress common.Address, net
 	if !exists {
 		return fmt.Errorf("network [%s] not found in StakeWise vaults", network)
 	}
-	vault, exists := vaults[vaultAddress]
-	if !exists {
+	var vault *StakeWiseVault
+	for _, candidate := range vaults {
+		if candidate.Address == vaultAddress {
+			vault = candidate
+			break
+		}
+	}
+	if vault == nil {
 		return fmt.Errorf("vault with address [%s] not found", vaultAddress.Hex())
 	}
 
@@ -312,8 +310,15 @@ func (d *Database) MarkDepositDataSetUploaded(vaultAddress common.Address, netwo
 	if !exists {
 		return fmt.Errorf("network [%s] not found in StakeWise vaults", network)
 	}
-	vault, exists := vaults[vaultAddress]
-	if !exists {
+
+	var vault *StakeWiseVault
+	for _, candidate := range vaults {
+		if candidate.Address == vaultAddress {
+			vault = candidate
+			break
+		}
+	}
+	if vault == nil {
 		return fmt.Errorf("vault with address [%s] not found", vaultAddress.Hex())
 	}
 

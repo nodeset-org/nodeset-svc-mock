@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/nodeset-org/nodeset-svc-mock/api"
+	"github.com/nodeset-org/nodeset-svc-mock/db"
 )
 
 func (s *NodeSetMockServer) getDepositData(w http.ResponseWriter, r *http.Request) {
@@ -23,8 +24,14 @@ func (s *NodeSetMockServer) getDepositData(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	vaultAddress := common.HexToAddress(args.Get("vault"))
-	vault, exists := vaults[vaultAddress]
-	if !exists {
+	var vault *db.StakeWiseVault
+	for _, candidate := range vaults {
+		if candidate.Address == vaultAddress {
+			vault = candidate
+			break
+		}
+	}
+	if vault == nil {
 		handleInputError(s.logger, w, fmt.Errorf("vault with address [%s] not found", vaultAddress.Hex()))
 		return
 	}

@@ -7,7 +7,6 @@ import (
 )
 
 type Validator struct {
-	Index               int
 	Pubkey              beacon.ValidatorPubkey
 	VaultAddress        common.Address
 	DepositData         beacon.ExtendedDepositData
@@ -16,9 +15,8 @@ type Validator struct {
 	DepositDataUsed     bool
 }
 
-func newValidator(depositData beacon.ExtendedDepositData, index int, vaultAddress common.Address) *Validator {
+func newValidator(depositData beacon.ExtendedDepositData, vaultAddress common.Address) *Validator {
 	return &Validator{
-		Index:        index,
 		Pubkey:       beacon.ValidatorPubkey(depositData.PublicKey),
 		VaultAddress: vaultAddress,
 		DepositData:  depositData,
@@ -37,7 +35,6 @@ func (v *Validator) SetExitMessage(exitMessage api.ExitMessage) {
 
 func (v *Validator) Clone() *Validator {
 	return &Validator{
-		Index:               v.Index,
 		Pubkey:              v.Pubkey,
 		VaultAddress:        v.VaultAddress,
 		DepositData:         v.DepositData,

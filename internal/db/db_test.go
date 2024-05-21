@@ -30,8 +30,8 @@ func TestDatabaseClone(t *testing.T) {
 	t.Log("Clone has identical contents to the original database but different pointers")
 
 	// Get the first pubkey from user 2 that hasn't been uploaded yet
-	user2 := db.Users[test.User2Email]
-	vault := db.StakeWiseVaults[test.Network][test.StakeWiseVaultAddress]
+	user2 := db.Users[2]
+	vault := db.StakeWiseVaults[test.Network][0]
 	var pubkey beacon.ValidatorPubkey
 	found := false
 	for _, node := range user2.Nodes {
@@ -54,12 +54,12 @@ func TestDatabaseClone(t *testing.T) {
 	t.Logf("Using pubkey %s for testing", pubkey.HexWithPrefix())
 
 	// Mark the pubkey as uploaded in the original database
-	assert.Equal(t, false, db.StakeWiseVaults[test.Network][test.StakeWiseVaultAddress].UploadedData[pubkey])
-	db.StakeWiseVaults[test.Network][test.StakeWiseVaultAddress].MarkDepositDataUploaded(pubkey)
+	assert.Equal(t, false, db.StakeWiseVaults[test.Network][0].UploadedData[pubkey])
+	db.StakeWiseVaults[test.Network][0].MarkDepositDataUploaded(pubkey)
 	t.Log("Marked deposit data uploaded for StakeWise vault")
 
 	// Make sure the clone didn't get the update
-	if clone.StakeWiseVaults[test.Network][test.StakeWiseVaultAddress].UploadedData[pubkey] {
+	if clone.StakeWiseVaults[test.Network][0].UploadedData[pubkey] {
 		t.Fatalf("Clone got the update")
 	}
 	t.Log("Clone wasn't updated, as expected")
@@ -72,22 +72,12 @@ func TestDatabaseClone(t *testing.T) {
 // Compare two databases
 func compareDatabases(t *testing.T, db *db.Database, clone *db.Database) {
 	// Compare StakeWise vault networks
-	assert.Equal(t, len(db.StakeWiseVaults), len(clone.StakeWiseVaults))
+	assert.Equal(t, db.StakeWiseVaults, clone.StakeWiseVaults)
 	for network, vaults := range db.StakeWiseVaults {
-		// Compare vaults in this network
-		cloneVaults, exists := clone.StakeWiseVaults[network]
-		if !exists {
-			t.Errorf("Expected vault network [%s] in clone, got none", network)
-		}
-		assert.Equal(t, len(vaults), len(cloneVaults))
-		for address, vault := range vaults {
-			// Compare this vault
-			cloneVault, exists := cloneVaults[address]
-			if !exists {
-				t.Errorf("Expected vault address [%s] in clone, got none", address.Hex())
-			}
+		cloneVaults := clone.StakeWiseVaults[network]
+		for i, vault := range vaults {
+			cloneVault := cloneVaults[i]
 			assert.NotSame(t, vault, cloneVault)
-			assert.Equal(t, vault, cloneVault)
 		}
 	}
 
@@ -95,16 +85,16 @@ func compareDatabases(t *testing.T, db *db.Database, clone *db.Database) {
 	assert.Equal(t, db.Users, clone.Users)
 
 	// Make sure the user pointers are all different
-	for email, user := range db.Users {
-		cloneUser := clone.Users[email]
+	for i, user := range db.Users {
+		cloneUser := clone.Users[i]
 		assert.NotSame(t, user, cloneUser)
-		for address, node := range user.Nodes {
-			cloneNode := cloneUser.Nodes[address]
+		for j, node := range user.Nodes {
+			cloneNode := cloneUser.Nodes[j]
 			assert.NotSame(t, node, cloneNode)
-			for network, validators := range node.Validators {
-				cloneValidators := cloneNode.Validators[network]
-				for pubkey, validator := range validators {
-					cloneValidator := cloneValidators[pubkey]
+			for k, validators := range node.Validators {
+				cloneValidators := cloneNode.Validators[k]
+				for l, validator := range validators {
+					cloneValidator := cloneValidators[l]
 					assert.NotSame(t, validator, cloneValidator)
 				}
 			}

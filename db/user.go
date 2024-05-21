@@ -5,34 +5,32 @@ import (
 )
 
 type User struct {
-	Index int
 	Email string
-	Nodes map[common.Address]*Node
-
-	nextNodeIndex int
+	Nodes []*Node
 }
 
-func newUser(email string, index int) *User {
+func newUser(email string) *User {
 	return &User{
-		Index: index,
 		Email: email,
-		Nodes: map[common.Address]*Node{},
+		Nodes: []*Node{},
 	}
 }
 
 func (u *User) AddNode(nodeAddress common.Address) {
-	if _, exists := u.Nodes[nodeAddress]; !exists {
-		node := newNode(nodeAddress, u.nextNodeIndex)
-		u.Nodes[nodeAddress] = node
-		u.nextNodeIndex++
+	for _, node := range u.Nodes {
+		if node.Address == nodeAddress {
+			return
+		}
 	}
+	node := newNode(nodeAddress)
+	u.Nodes = append(u.Nodes, node)
 }
 
 func (u *User) Clone() *User {
-	clone := newUser(u.Email, u.Index)
-	clone.nextNodeIndex = u.nextNodeIndex
-	for address, node := range u.Nodes {
-		clone.Nodes[address] = node.Clone()
+	clone := newUser(u.Email)
+	clone.Nodes = make([]*Node, len(u.Nodes))
+	for i, node := range u.Nodes {
+		clone.Nodes[i] = node.Clone()
 	}
 	return clone
 }

@@ -3,10 +3,8 @@ package server
 import (
 	"fmt"
 	"net/http"
-	"sort"
 
 	"github.com/nodeset-org/nodeset-svc-mock/api"
-	"github.com/nodeset-org/nodeset-svc-mock/db"
 	"github.com/nodeset-org/nodeset-svc-mock/internal/test"
 )
 
@@ -28,15 +26,8 @@ func (s *NodeSetMockServer) getValidators(w http.ResponseWriter, r *http.Request
 	validatorStatuses := []api.ValidatorStatus{}
 	validatorsForNetwork := node.Validators[network]
 
-	// Iterate the validators, sorted by index
-	validators := make([]*db.Validator, 0, len(validatorsForNetwork))
+	// Iterate the validators
 	for _, validator := range validatorsForNetwork {
-		validators = append(validators, validator)
-	}
-	sort.SliceStable(validators, func(i int, j int) bool {
-		return validators[i].Index < validators[j].Index
-	})
-	for _, validator := range validators {
 		pubkey := validator.Pubkey
 		status := s.manager.Database.GetValidatorStatus(network, pubkey)
 		validatorStatuses = append(validatorStatuses, api.ValidatorStatus{

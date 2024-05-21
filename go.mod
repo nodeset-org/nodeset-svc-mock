@@ -32,7 +32,6 @@ require (
 	github.com/rocket-pool/node-manager-core v0.3.1
 	github.com/stretchr/testify v1.9.0
 	github.com/tyler-smith/go-bip39 v1.1.0
-	github.com/wealdtech/go-eth2-types v1.0.0
 	github.com/wealdtech/go-eth2-types/v2 v2.8.2
 )
 
@@ -59,7 +58,6 @@ require (
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
-	github.com/phoreproject/bls v0.0.0-20190821133044-da95d4798b09 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.19.0 // indirect
