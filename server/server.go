@@ -19,6 +19,11 @@ import (
 	"github.com/rocket-pool/node-manager-core/log"
 )
 
+const (
+	adminSnapshotPath = "/snapshot"
+	adminRevertPath   = "/revert"
+)
+
 type NodeSetMockServer struct {
 	logger  *slog.Logger
 	ip      string
@@ -46,8 +51,10 @@ func NewNodeSetMockServer(logger *slog.Logger, ip string, port uint16) (*NodeSet
 	}
 
 	// Register each route
-	nmcRouter := router.PathPrefix("/api").Subrouter()
-	server.registerRoutes(nmcRouter)
+	apiRouter := router.PathPrefix("/api").Subrouter()
+	server.registerApiRoutes(apiRouter)
+	adminRouter := router.PathPrefix("/admin").Subrouter()
+	server.registerAdminRoutes(adminRouter)
 	return server, nil
 }
 
@@ -92,9 +99,9 @@ func (s *NodeSetMockServer) GetPort() uint16 {
 	return s.port
 }
 
-// Register all of the routes
-func (s *NodeSetMockServer) registerRoutes(nmcRouter *mux.Router) {
-	nmcRouter.HandleFunc("/"+api.DepositDataMetaPath, func(w http.ResponseWriter, r *http.Request) {
+// Register all of the API routes
+func (s *NodeSetMockServer) registerApiRoutes(apiRouter *mux.Router) {
+	apiRouter.HandleFunc("/"+api.DepositDataMetaPath, func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			s.depositDataMeta(w, r)
@@ -102,7 +109,7 @@ func (s *NodeSetMockServer) registerRoutes(nmcRouter *mux.Router) {
 			handleInvalidMethod(s.logger, w)
 		}
 	})
-	nmcRouter.HandleFunc("/"+api.DepositDataPath, func(w http.ResponseWriter, r *http.Request) {
+	apiRouter.HandleFunc("/"+api.DepositDataPath, func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			s.getDepositData(w, r)
@@ -112,7 +119,7 @@ func (s *NodeSetMockServer) registerRoutes(nmcRouter *mux.Router) {
 			handleInvalidMethod(s.logger, w)
 		}
 	})
-	nmcRouter.HandleFunc("/"+api.ValidatorsPath, func(w http.ResponseWriter, r *http.Request) {
+	apiRouter.HandleFunc("/"+api.ValidatorsPath, func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			s.getValidators(w, r)
@@ -121,6 +128,34 @@ func (s *NodeSetMockServer) registerRoutes(nmcRouter *mux.Router) {
 		default:
 			handleInvalidMethod(s.logger, w)
 		}
+	})
+}
+
+// Admin routes for snapshotting
+func (s *NodeSetMockServer) registerAdminRoutes(adminRouter *mux.Router) {
+	adminRouter.HandleFunc(adminSnapshotPath, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			handleInvalidMethod(s.logger, w)
+			return
+		}
+
+		snapshotName := r.URL.Query().Get("name")
+		s.manager.TakeSnapshot(snapshotName)
+		handleSuccess(w, s.logger, "")
+	})
+	adminRouter.HandleFunc(adminRevertPath, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			handleInvalidMethod(s.logger, w)
+			return
+		}
+
+		snapshotName := r.URL.Query().Get("name")
+		err := s.manager.RevertToSnapshot(snapshotName)
+		if err != nil {
+			handleServerError(w, s.logger, err)
+			return
+		}
+		handleSuccess(w, s.logger, "")
 	})
 }
 
