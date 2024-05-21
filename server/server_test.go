@@ -74,7 +74,12 @@ func cleanup() {
 func TestUnknownRoute(t *testing.T) {
 	// Take a snapshot
 	server.manager.TakeSnapshot("test")
-	defer server.manager.RevertToSnapshot("test")
+	defer func() {
+		err := server.manager.RevertToSnapshot("test")
+		if err != nil {
+			t.Fatalf("error reverting to snapshot: %v", err)
+		}
+	}()
 
 	// Send a message without an auth header
 	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/unknown_route", port), nil)
@@ -99,7 +104,12 @@ func TestUnknownRoute(t *testing.T) {
 func TestMissingHeader(t *testing.T) {
 	// Take a snapshot
 	server.manager.TakeSnapshot("test")
-	defer server.manager.RevertToSnapshot("test")
+	defer func() {
+		err := server.manager.RevertToSnapshot("test")
+		if err != nil {
+			t.Fatalf("error reverting to snapshot: %v", err)
+		}
+	}()
 
 	// Send a message without an auth header
 	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/%s", port, api.DepositDataMetaPath), nil)
@@ -124,7 +134,12 @@ func TestMissingHeader(t *testing.T) {
 func TestUnregisteredNode(t *testing.T) {
 	// Take a snapshot
 	server.manager.TakeSnapshot("test")
-	defer server.manager.RevertToSnapshot("test")
+	defer func() {
+		err := server.manager.RevertToSnapshot("test")
+		if err != nil {
+			t.Fatalf("error reverting to snapshot: %v", err)
+		}
+	}()
 
 	// Send a message without an auth header
 	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/%s", port, api.DepositDataMetaPath), nil)
@@ -138,7 +153,10 @@ func TestUnregisteredNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting private key: %v", err)
 	}
-	auth.AddAuthorizationHeader(request, node0Key)
+	err = auth.AddAuthorizationHeader(request, node0Key)
+	if err != nil {
+		t.Fatalf("error adding auth header: %v", err)
+	}
 	t.Logf("Added auth header")
 
 	// Send the request

@@ -20,7 +20,12 @@ import (
 func TestUploadDepositData(t *testing.T) {
 	// Take a snapshot
 	server.manager.TakeSnapshot("test")
-	defer server.manager.RevertToSnapshot("test")
+	defer func() {
+		err := server.manager.RevertToSnapshot("test")
+		if err != nil {
+			t.Fatalf("error reverting to snapshot: %v", err)
+		}
+	}()
 
 	// Provision the database
 	db := idb.ProvisionFullDatabase(t, logger, false)
@@ -81,7 +86,10 @@ func runUploadDepositDataRequest(t *testing.T, nodeKey *ecdsa.PrivateKey, deposi
 	t.Logf("Created request")
 
 	// Add the auth header
-	auth.AddAuthorizationHeader(request, nodeKey)
+	err = auth.AddAuthorizationHeader(request, nodeKey)
+	if err != nil {
+		t.Fatalf("error adding auth header: %v", err)
+	}
 	t.Logf("Added auth header")
 
 	// Send the request

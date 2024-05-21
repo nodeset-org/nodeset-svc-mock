@@ -83,7 +83,7 @@ func (s *NodeSetMockServer) Start(wg *sync.WaitGroup) error {
 // Stops the HTTP listener
 func (s *NodeSetMockServer) Stop() error {
 	err := s.server.Shutdown(context.Background())
-	if err != nil {
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("error stopping listener: %w", err)
 	}
 	return nil

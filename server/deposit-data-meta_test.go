@@ -22,7 +22,12 @@ func TestDepositDataMeta(t *testing.T) {
 
 	// Take a snapshot
 	server.manager.TakeSnapshot("test")
-	defer server.manager.RevertToSnapshot("test")
+	defer func() {
+		err := server.manager.RevertToSnapshot("test")
+		if err != nil {
+			t.Fatalf("error reverting to snapshot: %v", err)
+		}
+	}()
 
 	// Provision the database
 	node0Key, err := test.GetEthPrivateKey(0)
@@ -57,7 +62,10 @@ func TestDepositDataMeta(t *testing.T) {
 	t.Logf("Created request")
 
 	// Add the auth header
-	auth.AddAuthorizationHeader(request, node0Key)
+	err = auth.AddAuthorizationHeader(request, node0Key)
+	if err != nil {
+		t.Fatalf("error adding auth header: %v", err)
+	}
 	t.Logf("Added auth header")
 
 	// Send the request

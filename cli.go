@@ -78,7 +78,11 @@ func main() {
 		go func() {
 			<-termListener
 			fmt.Println("Shutting down...")
-			server.Stop()
+			err := server.Stop()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error stopping server: %v", err)
+				os.Exit(1)
+			}
 		}()
 
 		// Run the daemon until closed

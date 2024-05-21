@@ -91,7 +91,10 @@ func ProvisionFullDatabase(t *testing.T, logger *slog.Logger, includeDepositData
 	t.Log("Uploaded deposit data to StakeWise")
 
 	// Finalize the upload
-	db.MarkDepositDataSetUploaded(test.StakeWiseVaultAddress, test.Network, depositDataSet)
+	err = db.MarkDepositDataSetUploaded(test.StakeWiseVaultAddress, test.Network, depositDataSet)
+	if err != nil {
+		t.Fatalf("Error marking deposit data set uploaded: %v", err)
+	}
 	t.Log("Marked deposit data set uploaded")
 	return db
 }

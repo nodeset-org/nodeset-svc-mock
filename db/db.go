@@ -82,14 +82,11 @@ func (d *Database) Clone() *Database {
 
 	// Copy StakeWise vaults
 	for network, vaults := range d.StakeWiseVaults {
-		for _, vault := range vaults {
-			clone.AddStakeWiseVault(vault.Address, network)
-			networkVaults := make([]*StakeWiseVault, len(vaults))
-			for i, vault := range vaults {
-				networkVaults[i] = vault.Clone()
-			}
-			clone.StakeWiseVaults[network] = networkVaults
+		networkVaults := make([]*StakeWiseVault, len(vaults))
+		for i, vault := range vaults {
+			networkVaults[i] = vault.Clone()
 		}
+		clone.StakeWiseVaults[network] = networkVaults
 	}
 
 	// Copy users

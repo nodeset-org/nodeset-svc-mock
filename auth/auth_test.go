@@ -117,6 +117,9 @@ func generateRequest(privateKey *ecdsa.PrivateKey, method string, body io.Reader
 	request.URL.RawQuery = query.Encode()
 
 	// Add the auth header
-	AddAuthorizationHeader(request, privateKey)
+	err = AddAuthorizationHeader(request, privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("error adding auth header: %w", err)
+	}
 	return request, nil
 }
