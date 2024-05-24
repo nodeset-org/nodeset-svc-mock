@@ -100,6 +100,7 @@ func (d *Database) Clone() *Database {
 // === Getters ===
 // ===============
 
+// Get a node by address
 func (d *Database) GetNode(address common.Address) *Node {
 	for _, user := range d.Users {
 		for _, candidate := range user.Nodes {
@@ -112,50 +113,18 @@ func (d *Database) GetNode(address common.Address) *Node {
 }
 
 // Get the StakeWise status of a validator
-func (d *Database) GetValidatorStatus(network string, pubkey beacon.ValidatorPubkey) api.StakeWiseStatus {
-	vaults, exists := d.StakeWiseVaults[network]
+func (d *Database) GetStakeWiseVault(address common.Address, networkName string) *StakeWiseVault {
+	vaults, exists := d.StakeWiseVaults[networkName]
 	if !exists {
-		return api.StakeWiseStatus_Pending
+		return nil
 	}
-
-	// Get the validator for this pubkey
-	var validator *Validator
-	for _, user := range d.Users {
-		for _, node := range user.Nodes {
-			validators, exists := node.Validators[network]
-			if !exists {
-				continue
-			}
-			for _, candidate := range validators {
-				if candidate.Pubkey == pubkey {
-					validator = candidate
-					break
-				}
-			}
-		}
-		if validator != nil {
-			break
-		}
-	}
-	if validator == nil {
-		return api.StakeWiseStatus_Pending
-	}
-
-	// Check if the StakeWise vault has already seen it
 	for _, vault := range vaults {
-		if vault.Address == validator.VaultAddress && vault.UploadedData[validator.Pubkey] {
-			return api.StakeWiseStatus_Uploaded
+		if vault.Address == address {
+			return vault
 		}
 	}
-
-	// Check to see if the deposit data has been used
-	if validator.DepositDataUsed {
-		return api.StakeWiseStatus_Uploading
-	}
-	return api.StakeWiseStatus_Pending
+	return nil
 }
-
-// ==========================
 
 // Handle a new collection of deposit data uploads from a node
 func (d *Database) HandleDepositDataUpload(nodeAddress common.Address, data []beacon.ExtendedDepositData) error {

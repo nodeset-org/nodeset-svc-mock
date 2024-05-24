@@ -32,11 +32,11 @@ func TestGetValidators(t *testing.T) {
 		t.Fatalf("error getting private key: %v", err)
 	}
 	node0Pubkey := crypto.PubkeyToAddress(node0Key.PublicKey)
-	err = server.manager.Database.AddUser(test.User0Email)
+	err = server.manager.AddUser(test.User0Email)
 	if err != nil {
 		t.Fatalf("error adding user: %v", err)
 	}
-	err = server.manager.Database.AddNodeAccount(test.User0Email, node0Pubkey)
+	err = server.manager.AddNodeAccount(test.User0Email, node0Pubkey)
 	if err != nil {
 		t.Fatalf("error adding node account: %v", err)
 	}

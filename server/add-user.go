@@ -20,7 +20,7 @@ func (s *NodeSetMockServer) addUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a new deposit data set
-	err := s.manager.Database.AddUser(email)
+	err := s.manager.AddUser(email)
 	if err != nil {
 		handleServerError(w, s.logger, err)
 		return

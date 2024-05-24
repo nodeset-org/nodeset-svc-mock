@@ -38,6 +38,8 @@ func TestRecoverPubkey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error signing auth message: %v", err)
 	}
+	// fix the ECDSA 'v' (see https://medium.com/mycrypto/the-magic-of-digital-signatures-on-ethereum-98fe184dc9c7#:~:text=The%20version%20number,2%E2%80%9D%20was%20introduced)
+	signature[crypto.RecoveryIDOffset] += 27
 	t.Logf("Signed auth message, signature = %x", signature)
 
 	// Get the pubkey from the signature

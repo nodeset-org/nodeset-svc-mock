@@ -39,27 +39,25 @@ func (s *NodeSetMockServer) cycleSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a new deposit data set
-	set := s.manager.Database.CreateNewDepositDataSet(networkName, int(validatorsPerUser))
+	set := s.manager.CreateNewDepositDataSet(networkName, int(validatorsPerUser))
 	s.logger.Info("Created new deposit data set", "network", networkName, "user-limit", validatorsPerUser)
 
-	err = s.manager.Database.UploadDepositDataToStakeWise(vaultAddress, networkName, set)
+	err = s.manager.UploadDepositDataToStakeWise(vaultAddress, networkName, set)
 	if err != nil {
 		handleServerError(w, s.logger, err)
 		return
 	}
 	s.logger.Info("Uploaded deposit data set", "vault", vaultAddress.Hex())
 
-	err = s.manager.Database.MarkDepositDataSetUploaded(vaultAddress, networkName, set)
+	err = s.manager.MarkDepositDataSetUploaded(vaultAddress, networkName, set)
 	if err != nil {
 		handleServerError(w, s.logger, err)
 		return
 	}
 
-	for _, vault := range s.manager.Database.StakeWiseVaults[networkName] {
-		if vault.Address == vaultAddress {
-			s.logger.Info("Marked deposit data set as uploaded", "version", vault.LatestDepositDataSetIndex)
-			break
-		}
+	vault := s.manager.GetStakeWiseVault(vaultAddress, networkName)
+	if vault != nil {
+		s.logger.Info("Marked deposit data set as uploaded", "version", vault.LatestDepositDataSetIndex)
 	}
 	handleSuccess(w, s.logger, "")
 }

@@ -28,7 +28,7 @@ func (s *NodeSetMockServer) addStakeWiseVault(w http.ResponseWriter, r *http.Req
 	address := common.HexToAddress(addressString)
 
 	// Create a new deposit data set
-	err := s.manager.Database.AddStakeWiseVault(address, network)
+	err := s.manager.AddStakeWiseVault(address, network)
 	if err != nil {
 		handleServerError(w, s.logger, err)
 		return

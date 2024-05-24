@@ -15,7 +15,7 @@ func (s *NodeSetMockServer) uploadDepositData(w http.ResponseWriter, r *http.Req
 	}
 
 	// Handle the upload
-	err := s.manager.Database.HandleDepositDataUpload(node.Address, depositData)
+	err := s.manager.HandleDepositDataUpload(node.Address, depositData)
 	if err != nil {
 		handleServerError(w, s.logger, err)
 		return

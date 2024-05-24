@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/nodeset-org/nodeset-svc-mock/api"
-	"github.com/nodeset-org/nodeset-svc-mock/db"
 )
 
 func (s *NodeSetMockServer) depositDataMeta(w http.ResponseWriter, r *http.Request) {
@@ -18,21 +17,10 @@ func (s *NodeSetMockServer) depositDataMeta(w http.ResponseWriter, r *http.Reque
 
 	// Input validation
 	network := args.Get("network")
-	vaults, exists := s.manager.Database.StakeWiseVaults[network]
-	if !exists {
-		handleInputError(s.logger, w, fmt.Errorf("unsupported network [%s]", network))
-		return
-	}
 	vaultAddress := common.HexToAddress(args.Get("vault"))
-	var vault *db.StakeWiseVault
-	for _, candidate := range vaults {
-		if candidate.Address == vaultAddress {
-			vault = candidate
-			break
-		}
-	}
+	vault := s.manager.GetStakeWiseVault(vaultAddress, network)
 	if vault == nil {
-		handleInputError(s.logger, w, fmt.Errorf("vault with address [%s] not found", vaultAddress.Hex()))
+		handleInputError(s.logger, w, fmt.Errorf("vault with address [%s] on network [%s] not found", vaultAddress.Hex(), network))
 		return
 	}
 

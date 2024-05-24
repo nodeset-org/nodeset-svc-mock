@@ -20,11 +20,13 @@ const (
 	authHeader string = "Authorization"
 )
 
+// Authorizer is used to verify incoming requests have a valid signature and add signatures to outgoing requests
 type Authorizer struct {
 	authMessageHash []byte
 	logger          *slog.Logger
 }
 
+// Creates a new authorizer
 func NewAuthorizer(logger *slog.Logger) *Authorizer {
 	authMessageHash := accounts.TextHash([]byte(nodesetAuthMessage))
 	return &Authorizer{
@@ -53,6 +55,7 @@ func (a *Authorizer) VerifyRequest(r *http.Request) (common.Address, bool, error
 // === Utils ===
 // =============
 
+// Adds an authorization header to an HTTP request
 func AddAuthorizationHeader(request *http.Request, privateKey *ecdsa.PrivateKey) error {
 	// Sign the auth message
 	messageHash := accounts.TextHash([]byte(nodesetAuthMessage))
@@ -60,6 +63,8 @@ func AddAuthorizationHeader(request *http.Request, privateKey *ecdsa.PrivateKey)
 	if err != nil {
 		return fmt.Errorf("error signing auth message: %v", err)
 	}
+	// fix the ECDSA 'v' (see https://medium.com/mycrypto/the-magic-of-digital-signatures-on-ethereum-98fe184dc9c7#:~:text=The%20version%20number,2%E2%80%9D%20was%20introduced)
+	signature[crypto.RecoveryIDOffset] += 27
 	request.Header.Set(authHeader, utils.EncodeHexWithPrefix(signature))
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
 	return nil
@@ -71,6 +76,10 @@ func AddAuthorizationHeader(request *http.Request, privateKey *ecdsa.PrivateKey)
 
 // Gets the address of the private key used to sign a message from a signature
 func (a *Authorizer) getAddressFromSignature(signature []byte) (common.Address, error) {
+	// fix the ECDSA 'v' (see https://medium.com/mycrypto/the-magic-of-digital-signatures-on-ethereum-98fe184dc9c7#:~:text=The%20version%20number,2%E2%80%9D%20was%20introduced)
+	if signature[crypto.RecoveryIDOffset] >= 4 {
+		signature[crypto.RecoveryIDOffset] -= 27
+	}
 	pubkeyBytes, err := crypto.SigToPub(a.authMessageHash, signature)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("error recovering pubkey from signature: %w", err)

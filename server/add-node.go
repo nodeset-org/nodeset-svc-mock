@@ -28,7 +28,7 @@ func (s *NodeSetMockServer) addNode(w http.ResponseWriter, r *http.Request) {
 	address := common.HexToAddress(addressString)
 
 	// Create a new deposit data set
-	err := s.manager.Database.AddNodeAccount(email, address)
+	err := s.manager.AddNodeAccount(email, address)
 	if err != nil {
 		handleServerError(w, s.logger, err)
 		return

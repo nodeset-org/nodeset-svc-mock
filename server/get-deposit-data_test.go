@@ -29,7 +29,7 @@ func TestGetDepositData(t *testing.T) {
 
 	// Provision the database
 	db := idb.ProvisionFullDatabase(t, logger, true)
-	server.manager.Database = db
+	server.manager.SetDatabase(db)
 
 	// Run a get deposit data request
 	parsedResponse := runGetDepositDataRequest(t)

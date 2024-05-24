@@ -29,7 +29,7 @@ func (s *NodeSetMockServer) getValidators(w http.ResponseWriter, r *http.Request
 	// Iterate the validators
 	for _, validator := range validatorsForNetwork {
 		pubkey := validator.Pubkey
-		status := s.manager.Database.GetValidatorStatus(network, pubkey)
+		status := s.manager.GetValidatorStatus(network, pubkey)
 		validatorStatuses = append(validatorStatuses, api.ValidatorStatus{
 			Pubkey:              pubkey,
 			Status:              string(status),

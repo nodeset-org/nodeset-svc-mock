@@ -167,7 +167,7 @@ func (s *NodeSetMockServer) processApiRequest(w http.ResponseWriter, r *http.Req
 
 func (s *NodeSetMockServer) processAuthHeader(w http.ResponseWriter, r *http.Request) *db.Node {
 	// Get the auth header
-	nodeAddress, hasHeader, err := s.manager.Authorizer.VerifyRequest(r)
+	nodeAddress, hasHeader, err := s.manager.VerifyRequest(r)
 	if err != nil {
 		handleAuthHeaderError(w, s.logger, err)
 		return nil
@@ -178,7 +178,7 @@ func (s *NodeSetMockServer) processAuthHeader(w http.ResponseWriter, r *http.Req
 	}
 
 	// Get the node
-	node := s.manager.Database.GetNode(nodeAddress)
+	node := s.manager.GetNode(nodeAddress)
 	if node == nil {
 		handleUnregisteredNode(w, s.logger, nodeAddress)
 		return nil
