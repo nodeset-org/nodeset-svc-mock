@@ -17,6 +17,9 @@ type Database struct {
 	// Collection of users
 	Users []*User
 
+	// Collection of sessions
+	Sessions []*Session
+
 	// Internal fields
 	logger *slog.Logger
 }
@@ -63,17 +66,81 @@ func (d *Database) AddUser(email string) error {
 	return nil
 }
 
-// Registers a node with a user
-func (d *Database) AddNodeAccount(email string, nodeAddress common.Address) error {
+// Whitelists a node with a user
+func (d *Database) WhitelistNodeAccount(email string, nodeAddress common.Address) error {
 	for _, user := range d.Users {
 		if user.Email != email {
 			continue
 		}
-		user.AddNode(nodeAddress)
+		user.WhitelistNode(nodeAddress)
 		return nil
 	}
 
 	return fmt.Errorf("user with email [%s] not found", email)
+}
+
+// Registers a node with a user
+func (d *Database) RegisterNodeAccount(email string, nodeAddress common.Address) error {
+	for _, user := range d.Users {
+		if user.Email != email {
+			continue
+		}
+		return user.RegisterNode(nodeAddress)
+	}
+
+	return fmt.Errorf("user with email [%s] not found", email)
+}
+
+// Creates a new session
+func (d *Database) CreateSession() *Session {
+	session := newSession()
+	d.Sessions = append(d.Sessions, session)
+	return session
+}
+
+// Gets a session by its nonce
+func (d *Database) GetSessionByNonce(nonce string) *Session {
+	for _, session := range d.Sessions {
+		if session.Nonce == nonce {
+			return session
+		}
+	}
+	return nil
+}
+
+// Gets a session by its token
+func (d *Database) GetSessionByToken(token string) *Session {
+	for _, session := range d.Sessions {
+		if session.Token == token {
+			return session
+		}
+	}
+	return nil
+}
+
+// Attempts to log an existing session in with the provided node address and nonce
+func (d *Database) Login(nodeAddress common.Address, nonce string) error {
+	// Get the session
+	session := d.GetSessionByNonce(nonce)
+	if session == nil {
+		return fmt.Errorf("no session with provided nonce")
+	}
+
+	if session.IsLoggedIn {
+		return fmt.Errorf("session already logged in")
+	}
+
+	// Find the user account for the node
+	for _, user := range d.Users {
+		for _, candidate := range user.RegisteredNodes {
+			if candidate.Address == nodeAddress {
+				session.login(nodeAddress)
+				return nil
+			}
+		}
+	}
+
+	return ErrUnregisteredNode
 }
 
 // Clones the database
@@ -93,6 +160,11 @@ func (d *Database) Clone() *Database {
 	for _, user := range d.Users {
 		clone.Users = append(clone.Users, user.Clone())
 	}
+
+	// Copy sessions
+	for _, session := range d.Sessions {
+		clone.Sessions = append(clone.Sessions, session.Clone())
+	}
 	return clone
 }
 
@@ -100,16 +172,21 @@ func (d *Database) Clone() *Database {
 // === Getters ===
 // ===============
 
-// Get a node by address
-func (d *Database) GetNode(address common.Address) *Node {
+// Get a node by address - returns true if registered, false if not registered and just whitelisted
+func (d *Database) GetNode(address common.Address) (*Node, bool) {
 	for _, user := range d.Users {
-		for _, candidate := range user.Nodes {
+		for _, candidate := range user.RegisteredNodes {
 			if candidate.Address == address {
-				return candidate
+				return candidate, true
+			}
+		}
+		for _, candidate := range user.WhitelistedNodes {
+			if candidate.Address == address {
+				return candidate, false
 			}
 		}
 	}
-	return nil
+	return nil, false
 }
 
 // Get the StakeWise status of a validator
@@ -131,7 +208,7 @@ func (d *Database) HandleDepositDataUpload(nodeAddress common.Address, data []be
 	// Get the node
 	var node *Node
 	for _, user := range d.Users {
-		for _, candidate := range user.Nodes {
+		for _, candidate := range user.RegisteredNodes {
 			if candidate.Address == nodeAddress {
 				node = candidate
 				break
@@ -142,7 +219,7 @@ func (d *Database) HandleDepositDataUpload(nodeAddress common.Address, data []be
 		}
 	}
 	if node == nil {
-		return fmt.Errorf("node with address [%s] not found", nodeAddress.Hex())
+		return fmt.Errorf("registered node with address [%s] not found", nodeAddress.Hex())
 	}
 
 	// Add the deposit data
@@ -173,7 +250,7 @@ func (d *Database) HandleSignedExitUpload(nodeAddress common.Address, network st
 	// Get the node
 	var node *Node
 	for _, user := range d.Users {
-		for _, candidate := range user.Nodes {
+		for _, candidate := range user.RegisteredNodes {
 			if candidate.Address == nodeAddress {
 				node = candidate
 				break
@@ -184,7 +261,7 @@ func (d *Database) HandleSignedExitUpload(nodeAddress common.Address, network st
 		}
 	}
 	if node == nil {
-		return fmt.Errorf("node with address [%s] not found", nodeAddress.Hex())
+		return fmt.Errorf("registered node with address [%s] not found", nodeAddress.Hex())
 	}
 
 	// Add the signed exits
@@ -222,7 +299,7 @@ func (d *Database) CreateNewDepositDataSet(network string, validatorsPerUser int
 	// Iterate the users
 	for _, user := range d.Users {
 		userCount := 0
-		for _, node := range user.Nodes {
+		for _, node := range user.RegisteredNodes {
 			validatorsForNetwork, exists := node.Validators[network]
 			if !exists {
 				continue
@@ -292,7 +369,7 @@ func (d *Database) MarkDepositDataSetUploaded(vaultAddress common.Address, netwo
 	for _, depositData := range data {
 		network := depositData.NetworkName
 		for _, user := range d.Users {
-			for _, node := range user.Nodes {
+			for _, node := range user.RegisteredNodes {
 				validators, exists := node.Validators[network]
 				if !exists {
 					continue

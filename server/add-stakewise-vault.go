@@ -9,7 +9,7 @@ import (
 
 func (s *NodeSetMockServer) addStakeWiseVault(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		handleInvalidMethod(s.logger, w)
+		handleInvalidMethod(w, s.logger)
 		return
 	}
 
@@ -17,12 +17,12 @@ func (s *NodeSetMockServer) addStakeWiseVault(w http.ResponseWriter, r *http.Req
 	query := r.URL.Query()
 	network := query.Get("network")
 	if network == "" {
-		handleInputError(s.logger, w, fmt.Errorf("missing network query parameter"))
+		handleInputError(w, s.logger, fmt.Errorf("missing network query parameter"))
 		return
 	}
 	addressString := query.Get("address")
 	if addressString == "" {
-		handleInputError(s.logger, w, fmt.Errorf("missing address query parameter"))
+		handleInputError(w, s.logger, fmt.Errorf("missing address query parameter"))
 		return
 	}
 	address := common.HexToAddress(addressString)

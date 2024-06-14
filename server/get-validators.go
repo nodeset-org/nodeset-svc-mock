@@ -1,28 +1,25 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/nodeset-org/nodeset-svc-mock/api"
-	"github.com/nodeset-org/nodeset-svc-mock/internal/test"
 )
 
 func (s *NodeSetMockServer) getValidators(w http.ResponseWriter, r *http.Request) {
 	// Get the requesting node
-	node, args := s.processApiRequest(w, r, nil)
+	args := s.processApiRequest(w, r, nil)
+	session := s.processAuthHeader(w, r)
+	if session == nil {
+		return
+	}
+	node := s.getNodeForSession(w, session)
 	if node == nil {
 		return
 	}
 
-	// Get the network
-	network := args.Get("network")
-	if network != test.Network {
-		handleInputError(s.logger, w, fmt.Errorf("unsupported network [%s]", network))
-		return
-	}
-
 	// Get the registered validators
+	network := args.Get("network")
 	validatorStatuses := []api.ValidatorStatus{}
 	validatorsForNetwork := node.Validators[network]
 
@@ -38,8 +35,8 @@ func (s *NodeSetMockServer) getValidators(w http.ResponseWriter, r *http.Request
 	}
 
 	// Write the response
-	response := api.ValidatorsResponse{
-		Data: validatorStatuses,
+	data := api.ValidatorsData{
+		Validators: validatorStatuses,
 	}
-	handleSuccess(w, s.logger, response)
+	handleSuccess(w, s.logger, data)
 }

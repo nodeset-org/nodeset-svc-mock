@@ -4,15 +4,15 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/nodeset-org/nodeset-svc-mock/db"
 	"github.com/nodeset-org/nodeset-svc-mock/internal/test"
 	"github.com/rocket-pool/node-manager-core/utils"
+	"github.com/stretchr/testify/require"
 )
 
 // =============
@@ -20,8 +20,6 @@ import (
 // =============
 
 func TestRecoverPubkey(t *testing.T) {
-	logger := slog.Default()
-
 	// Get a private key
 	privateKey, err := test.GetEthPrivateKey(0)
 	if err != nil {
@@ -32,34 +30,20 @@ func TestRecoverPubkey(t *testing.T) {
 	pubkey := crypto.PubkeyToAddress(privateKey.PublicKey)
 	t.Logf("Constructed private key, pubkey = %s", pubkey.Hex())
 
-	// Sign the auth message
-	messageHash := accounts.TextHash([]byte(nodesetAuthMessage))
-	signature, err := crypto.Sign(messageHash, privateKey)
-	if err != nil {
-		t.Fatalf("error signing auth message: %v", err)
-	}
-	// fix the ECDSA 'v' (see https://medium.com/mycrypto/the-magic-of-digital-signatures-on-ethereum-98fe184dc9c7#:~:text=The%20version%20number,2%E2%80%9D%20was%20introduced)
-	signature[crypto.RecoveryIDOffset] += 27
-	t.Logf("Signed auth message, signature = %x", signature)
+	// Sign a message
+	message := []byte("hello world")
+	signature, err := createSignature(message, privateKey)
+	require.NoError(t, err)
+	t.Logf("Signed message, signature = %x", signature)
 
 	// Get the pubkey from the signature
-	authorizer := NewAuthorizer(logger)
-	recoveredPubkey, err := authorizer.getAddressFromSignature(signature)
-	if err != nil {
-		t.Fatalf("error getting pubkey from signature: %v", err)
-	}
-	t.Logf("Recovered pubkey = %s", recoveredPubkey.Hex())
-
-	// Check the pubkey
-	if pubkey != recoveredPubkey {
-		t.Fatalf("pubkey mismatch: expected %s, got %s", pubkey.Hex(), recoveredPubkey.Hex())
-	}
-	t.Logf("Pubkey matches")
+	recoveredPubkey, err := getAddressFromSignature(message, signature)
+	require.NoError(t, err)
+	require.Equal(t, pubkey, recoveredPubkey)
+	t.Logf("Recovered pubkey matches, %s", recoveredPubkey.Hex())
 }
 
 func TestGoodRequest(t *testing.T) {
-	logger := slog.Default()
-
 	// Get a private key
 	privateKey, err := test.GetEthPrivateKey(0)
 	if err != nil {
@@ -76,25 +60,65 @@ func TestGoodRequest(t *testing.T) {
 		"vault":   vault,
 		"network": test.Network,
 	}
-	request, err := generateRequest(privateKey, http.MethodGet, nil, params, "deposit-data", "meta")
+	request, session, err := generateRequest(privateKey, http.MethodGet, nil, params, "deposit-data", "meta")
 	if err != nil {
 		t.Fatalf("error generating request: %v", err)
 	}
 	t.Log("Generated deposit-data/meta request")
 
 	// Verify the request
-	authorizer := NewAuthorizer(logger)
-	recoveredPubkey, _, err := authorizer.VerifyRequest(request)
+	token, err := GetSessionTokenFromRequest(request)
 	if err != nil {
-		t.Fatalf("error verifying request: %v", err)
+		t.Fatalf("error getting session token from request: %v", err)
 	}
-	t.Logf("Recovered pubkey = %s", recoveredPubkey.Hex())
+	require.Equal(t, session.Token, token)
+	t.Logf("Token matches (%s)", token)
+}
 
-	// Check the pubkey
-	if pubkey != recoveredPubkey {
-		t.Fatalf("pubkey mismatch: expected %s, got %s", pubkey.Hex(), recoveredPubkey.Hex())
+func TestRegistration(t *testing.T) {
+	// Get a private key
+	privateKey, err := test.GetEthPrivateKey(0)
+	if err != nil {
+		t.Fatalf("error getting private key: %v", err)
 	}
-	t.Logf("Pubkey matches")
+
+	// Get the pubkey for it
+	pubkey := crypto.PubkeyToAddress(privateKey.PublicKey)
+	t.Logf("Constructed private key, pubkey = %s", pubkey.Hex())
+
+	// Sign a registration message
+	email := test.User0Email
+	signature, err := GetSignatureForRegistration(email, pubkey, privateKey)
+	require.NoError(t, err)
+	t.Logf("Signed registration message, signature = %x", signature)
+
+	// Verify the signature
+	err = VerifyRegistrationSignature(email, pubkey, signature)
+	require.NoError(t, err)
+	t.Log("Verified registration signature")
+}
+
+func TestLogin(t *testing.T) {
+	// Get a private key
+	privateKey, err := test.GetEthPrivateKey(0)
+	if err != nil {
+		t.Fatalf("error getting private key: %v", err)
+	}
+
+	// Get the pubkey for it
+	pubkey := crypto.PubkeyToAddress(privateKey.PublicKey)
+	t.Logf("Constructed private key, pubkey = %s", pubkey.Hex())
+
+	// Sign a login message
+	nonce := "nonce"
+	signature, err := GetSignatureForLogin(nonce, pubkey, privateKey)
+	require.NoError(t, err)
+	t.Logf("Signed login message, signature = %x", signature)
+
+	// Verify the signature
+	err = VerifyLoginSignature(nonce, pubkey, signature)
+	require.NoError(t, err)
+	t.Log("Verified login signature")
 }
 
 // ==========================
@@ -102,15 +126,16 @@ func TestGoodRequest(t *testing.T) {
 // ==========================
 
 // Generate an HTTP request with the signed auth header
-func generateRequest(privateKey *ecdsa.PrivateKey, method string, body io.Reader, queryParams map[string]string, subroutes ...string) (*http.Request, error) {
+func generateRequest(privateKey *ecdsa.PrivateKey, method string, body io.Reader, queryParams map[string]string, subroutes ...string) (*http.Request, *db.Session, error) {
+
 	// Make the request
 	path, err := url.JoinPath("http://dummy", subroutes...)
 	if err != nil {
-		return nil, fmt.Errorf("error joining path [%v]: %w", subroutes, err)
+		return nil, nil, fmt.Errorf("error joining path [%v]: %w", subroutes, err)
 	}
 	request, err := http.NewRequest(method, path, body)
 	if err != nil {
-		return nil, fmt.Errorf("error generating request to [%s]: %w", path, err)
+		return nil, nil, fmt.Errorf("error generating request to [%s]: %w", path, err)
 	}
 	query := request.URL.Query()
 	for name, value := range queryParams {
@@ -118,10 +143,18 @@ func generateRequest(privateKey *ecdsa.PrivateKey, method string, body io.Reader
 	}
 	request.URL.RawQuery = query.Encode()
 
-	// Add the auth header
-	err = AddAuthorizationHeader(request, privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("error adding auth header: %w", err)
+	// Create a session
+	session := &db.Session{
+		Nonce:       "nonce",
+		Token:       "token",
+		NodeAddress: crypto.PubkeyToAddress(privateKey.PublicKey),
+		IsLoggedIn:  true,
 	}
-	return request, nil
+
+	// Add the auth header
+	AddAuthorizationHeader(request, session)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error adding auth header: %w", err)
+	}
+	return request, session, nil
 }

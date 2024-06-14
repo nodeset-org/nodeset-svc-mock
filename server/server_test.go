@@ -1,16 +1,21 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"sync"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/nodeset-org/nodeset-svc-mock/api"
 	"github.com/nodeset-org/nodeset-svc-mock/auth"
 	"github.com/nodeset-org/nodeset-svc-mock/internal/test"
+	"github.com/rocket-pool/node-manager-core/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -141,32 +146,60 @@ func TestUnregisteredNode(t *testing.T) {
 		}
 	}()
 
-	// Send a message without an auth header
-	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/%s", port, api.DepositDataMetaPath), nil)
+	// Create a session
+	session := server.manager.CreateSession()
+	node0Key, err := test.GetEthPrivateKey(0)
+	require.NoError(t, err)
+	node0Pubkey := crypto.PubkeyToAddress(node0Key.PublicKey)
+	loginSig, err := auth.GetSignatureForLogin(session.Nonce, node0Pubkey, node0Key)
+	require.NoError(t, err)
+	t.Log("Created session and login signature")
+
+	// Create a login request
+	sig := utils.EncodeHexWithPrefix(loginSig)
+	loginReq := api.LoginRequest{
+		Nonce:     session.Nonce,
+		Address:   node0Pubkey.Hex(),
+		Signature: sig,
+	}
+	body, err := json.Marshal(loginReq)
+	require.NoError(t, err)
+	request, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%d/api/%s", port, api.LoginPath), bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("error creating request: %v", err)
 	}
-	t.Logf("Created request")
+	t.Log("Created request")
 
 	// Add an auth header
-	node0Key, err := test.GetEthPrivateKey(0)
 	if err != nil {
 		t.Fatalf("error getting private key: %v", err)
 	}
-	err = auth.AddAuthorizationHeader(request, node0Key)
+	auth.AddAuthorizationHeader(request, session)
 	if err != nil {
 		t.Fatalf("error adding auth header: %v", err)
 	}
-	t.Logf("Added auth header")
+	t.Log("Added auth header")
 
 	// Send the request
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatalf("error sending request: %v", err)
 	}
-	t.Logf("Sent request")
+	defer response.Body.Close()
+	t.Log("Sent request")
 
-	// Check the response
+	// Check the status code
 	require.Equal(t, http.StatusUnauthorized, response.StatusCode)
-	t.Logf("Received unauthorized status code")
+	t.Log("Received unauthorized status code")
+
+	// Unmarshal into a response to make sure it returns the correct error key
+	var nodesetResponse api.NodeSetResponse[api.LoginData]
+	bodyBytes, err := io.ReadAll(response.Body)
+	t.Logf("Read response body: %s", string(bodyBytes))
+
+	require.NoError(t, err)
+	err = json.Unmarshal(bodyBytes, &nodesetResponse)
+	require.NoError(t, err)
+	require.Equal(t, unregisteredAddressKey, nodesetResponse.Error)
+	t.Logf("Received correct error key (%s)", unregisteredAddressKey)
 }

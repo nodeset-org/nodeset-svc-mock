@@ -4,33 +4,48 @@ import (
 	"github.com/rocket-pool/node-manager-core/beacon"
 )
 
-// api/deposit-data/meta
-type DepositDataMetaResponse struct {
+// All responses from the NodeSet API will have this format
+// `message` may or may not be populated (but should always be populated if `ok` is false)
+// `data` should be populated if `ok` is true, and will be omitted if `ok` is false
+type NodeSetResponse[DataType any] struct {
+	OK      bool     `json:"ok"`
+	Message string   `json:"message,omitempty"`
+	Data    DataType `json:"data,omitempty"`
+	Error   string   `json:"error,omitempty"`
+}
+
+// Response to a login request
+type LoginData struct {
+	Token string `json:"token"`
+}
+
+// Data used returned from nonce requests
+type NonceData struct {
+	Nonce string `json:"nonce"`
+	Token string `json:"token"`
+}
+
+// Response to a deposit data meta request
+type DepositDataMetaData struct {
 	Version int `json:"version"`
 }
 
-// api/deposit-data
-type DepositDataResponse struct {
-	Version int                          `json:"version"`
-	Data    []beacon.ExtendedDepositData `json:"data"`
+// Response to a deposit data request
+type DepositDataData struct {
+	Version     int                          `json:"version"`
+	DepositData []beacon.ExtendedDepositData `json:"depositData"`
 }
 
-// api/validators
+// Validator status info
 type ValidatorStatus struct {
 	Pubkey              beacon.ValidatorPubkey `json:"pubkey"`
 	Status              string                 `json:"status"`
 	ExitMessageUploaded bool                   `json:"exitMessage"`
 }
 
-// api/dev/validators
-type ValidatorsResponse struct {
-	Data []ValidatorStatus `json:"data"`
-}
-
-// Generic response for errors
-type ErrorResponse struct {
-	Ok      bool   `json:"ok"`
-	Message string `json:"message"`
+// Response to a validators request
+type ValidatorsData struct {
+	Validators []ValidatorStatus `json:"validators"`
 }
 
 // Status types for StakeWise validators

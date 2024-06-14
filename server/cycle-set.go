@@ -10,7 +10,7 @@ import (
 
 func (s *NodeSetMockServer) cycleSet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		handleInvalidMethod(s.logger, w)
+		handleInvalidMethod(w, s.logger)
 		return
 	}
 
@@ -18,23 +18,23 @@ func (s *NodeSetMockServer) cycleSet(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	networkName := query.Get("network")
 	if networkName == "" {
-		handleInputError(s.logger, w, fmt.Errorf("missing network query parameter"))
+		handleInputError(w, s.logger, fmt.Errorf("missing network query parameter"))
 		return
 	}
 	vaultAddressString := query.Get("vault")
 	if vaultAddressString == "" {
-		handleInputError(s.logger, w, fmt.Errorf("missing vault query parameter"))
+		handleInputError(w, s.logger, fmt.Errorf("missing vault query parameter"))
 		return
 	}
 	vaultAddress := common.HexToAddress(vaultAddressString)
 	userLimit := query.Get("user-limit")
 	if userLimit == "" {
-		handleInputError(s.logger, w, fmt.Errorf("missing user-limit query parameter"))
+		handleInputError(w, s.logger, fmt.Errorf("missing user-limit query parameter"))
 		return
 	}
 	validatorsPerUser, err := strconv.ParseInt(userLimit, 10, 32)
 	if err != nil {
-		handleInputError(s.logger, w, fmt.Errorf("error parsing user-limit: %w", err))
+		handleInputError(w, s.logger, fmt.Errorf("error parsing user-limit: %w", err))
 		return
 	}
 

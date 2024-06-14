@@ -9,7 +9,12 @@ import (
 func (s *NodeSetMockServer) uploadSignedExits(w http.ResponseWriter, r *http.Request) {
 	// Get the requesting node
 	var exitData []api.ExitData
-	node, args := s.processApiRequest(w, r, &exitData)
+	args := s.processApiRequest(w, r, &exitData)
+	session := s.processAuthHeader(w, r)
+	if session == nil {
+		return
+	}
+	node := s.getNodeForSession(w, session)
 	if node == nil {
 		return
 	}
@@ -21,5 +26,5 @@ func (s *NodeSetMockServer) uploadSignedExits(w http.ResponseWriter, r *http.Req
 		handleServerError(w, s.logger, err)
 		return
 	}
-	handleSuccess(w, s.logger, "")
+	handleSuccess(w, s.logger, struct{}{})
 }

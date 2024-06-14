@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,21 +15,23 @@ import (
 
 // Mock manager for the nodeset.io service
 type NodeSetMockManager struct {
-	database   *db.Database
-	authorizer *auth.Authorizer
+	database *db.Database
 
 	// Internal fields
 	snapshots map[string]*db.Database
 	logger    *slog.Logger
 }
 
+var (
+	ErrInvalidSession error = errors.New("session token is invalid")
+)
+
 // Creates a new manager
 func NewNodeSetMockManager(logger *slog.Logger) *NodeSetMockManager {
 	return &NodeSetMockManager{
-		database:   db.NewDatabase(logger),
-		authorizer: auth.NewAuthorizer(logger),
-		snapshots:  map[string]*db.Database{},
-		logger:     logger,
+		database:  db.NewDatabase(logger),
+		snapshots: map[string]*db.Database{},
+		logger:    logger,
 	}
 }
 
@@ -54,15 +57,6 @@ func (m *NodeSetMockManager) RevertToSnapshot(name string) error {
 	return nil
 }
 
-// ==================
-// === Authorizer ===
-// ==================
-
-// Verifies a request has a valid signature, and returns the address of the signer
-func (m *NodeSetMockManager) VerifyRequest(r *http.Request) (common.Address, bool, error) {
-	return m.authorizer.VerifyRequest(r)
-}
-
 // ================
 // === Database ===
 // ================
@@ -82,13 +76,67 @@ func (m *NodeSetMockManager) AddUser(email string) error {
 	return m.database.AddUser(email)
 }
 
-// Registers a node with a user
-func (m *NodeSetMockManager) AddNodeAccount(email string, nodeAddress common.Address) error {
-	return m.database.AddNodeAccount(email, nodeAddress)
+// Whitelists a node with a user
+func (m *NodeSetMockManager) WhitelistNodeAccount(email string, nodeAddress common.Address) error {
+	return m.database.WhitelistNodeAccount(email, nodeAddress)
 }
 
-// Get a node by address
-func (m *NodeSetMockManager) GetNode(address common.Address) *db.Node {
+// Registers a whitelisted node with a user
+func (m *NodeSetMockManager) RegisterNodeAccount(email string, nodeAddress common.Address, signature []byte) error {
+	// Verify the signature
+	err := auth.VerifyRegistrationSignature(email, nodeAddress, signature)
+	if err != nil {
+		return err
+	}
+
+	// Try to register the node
+	return m.database.RegisterNodeAccount(email, nodeAddress)
+}
+
+// Creates a new session and returns the nonce for it
+func (m *NodeSetMockManager) CreateSession() *db.Session {
+	return m.database.CreateSession()
+}
+
+// Logs a session in
+func (m *NodeSetMockManager) Login(nonce string, nodeAddress common.Address, signature []byte) error {
+	// Verify the signature
+	err := auth.VerifyLoginSignature(nonce, nodeAddress, signature)
+	if err != nil {
+		return err
+	}
+
+	// Log the session in
+	return m.database.Login(nodeAddress, nonce)
+}
+
+// Gets a session by nonce
+func (m *NodeSetMockManager) GetSessionByNonce(nonce string) *db.Session {
+	return m.database.GetSessionByNonce(nonce)
+}
+
+// Gets a session by token
+func (m *NodeSetMockManager) GetSessionByToken(token string) *db.Session {
+	return m.database.GetSessionByToken(token)
+}
+
+// Verifies a request's session and returns the node address the session belongs to
+func (m *NodeSetMockManager) VerifyRequest(r *http.Request) (*db.Session, error) {
+	token, err := auth.GetSessionTokenFromRequest(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the session
+	session := m.database.GetSessionByToken(token)
+	if session == nil {
+		return nil, ErrInvalidSession
+	}
+	return session, nil
+}
+
+// Get a node by address - returns true if registered, false if just whitelisted
+func (m *NodeSetMockManager) GetNode(address common.Address) (*db.Node, bool) {
 	return m.database.GetNode(address)
 }
 
@@ -102,7 +150,7 @@ func (m *NodeSetMockManager) GetValidatorStatus(network string, pubkey beacon.Va
 	// Get the validator for this pubkey
 	var validator *db.Validator
 	for _, user := range m.database.Users {
-		for _, node := range user.Nodes {
+		for _, node := range user.RegisteredNodes {
 			validators, exists := node.Validators[network]
 			if !exists {
 				continue

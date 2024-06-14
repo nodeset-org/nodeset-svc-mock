@@ -1,7 +1,6 @@
 package server
 
 import (
-	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/nodeset-org/nodeset-svc-mock/api"
 	"github.com/nodeset-org/nodeset-svc-mock/auth"
+	"github.com/nodeset-org/nodeset-svc-mock/db"
 	idb "github.com/nodeset-org/nodeset-svc-mock/internal/db"
 	"github.com/nodeset-org/nodeset-svc-mock/internal/test"
 	"github.com/rocket-pool/node-manager-core/beacon"
@@ -30,14 +30,14 @@ func TestUploadSignedExits(t *testing.T) {
 	// Provision the database
 	db := idb.ProvisionFullDatabase(t, logger, false)
 	server.manager.SetDatabase(db)
+	session := db.Sessions[0]
 
 	// Run a get deposit data request to make sure it's empty
-	parsedResponse := runGetDepositDataRequest(t)
-	require.Equal(t, 0, parsedResponse.Version)
-	require.Empty(t, parsedResponse.Data)
+	parsedResponse := runGetDepositDataRequest(t, session)
+	require.Equal(t, 0, parsedResponse.Data.Version)
+	require.Empty(t, parsedResponse.Data.DepositData)
 
 	// Generate new deposit data
-	nodeKey := idb.NodeKeys[0]
 	depositData := []beacon.ExtendedDepositData{
 		idb.GenerateDepositData(t, 0, test.StakeWiseVaultAddress),
 		idb.GenerateDepositData(t, 1, test.StakeWiseVaultAddress),
@@ -45,10 +45,10 @@ func TestUploadSignedExits(t *testing.T) {
 	t.Log("Generated deposit data")
 
 	// Run an upload deposit data request
-	runUploadDepositDataRequest(t, nodeKey, depositData)
+	runUploadDepositDataRequest(t, session, depositData)
 
 	// Run a get deposit data request to make sure it's uploaded
-	validatorsResponse := runGetValidatorsRequest(t, nodeKey)
+	validatorsResponse := runGetValidatorsRequest(t, session)
 	expectedData := []api.ValidatorStatus{
 		{
 			Pubkey:              beacon.ValidatorPubkey(depositData[0].PublicKey),
@@ -61,7 +61,7 @@ func TestUploadSignedExits(t *testing.T) {
 			ExitMessageUploaded: false,
 		},
 	}
-	require.Equal(t, expectedData, validatorsResponse.Data)
+	require.Equal(t, expectedData, validatorsResponse.Data.Validators)
 	t.Logf("Received matching response")
 
 	// Generate a signed exit for validator 1
@@ -69,11 +69,11 @@ func TestUploadSignedExits(t *testing.T) {
 	t.Log("Generated signed exit")
 
 	// Upload it
-	runUploadSignedExitsRequest(t, nodeKey, []api.ExitData{signedExit1})
+	runUploadSignedExitsRequest(t, session, []api.ExitData{signedExit1})
 	t.Logf("Uploaded signed exit")
 
 	// Get the validator status again
-	validatorsResponse = runGetValidatorsRequest(t, nodeKey)
+	validatorsResponse = runGetValidatorsRequest(t, session)
 	expectedData = []api.ValidatorStatus{
 		{
 			Pubkey:              beacon.ValidatorPubkey(depositData[0].PublicKey),
@@ -86,11 +86,11 @@ func TestUploadSignedExits(t *testing.T) {
 			ExitMessageUploaded: true, // This should be true now
 		},
 	}
-	require.Equal(t, expectedData, validatorsResponse.Data)
+	require.Equal(t, expectedData, validatorsResponse.Data.Validators)
 	t.Logf("Received matching response")
 }
 
-func runUploadSignedExitsRequest(t *testing.T, nodeKey *ecdsa.PrivateKey, signedExits []api.ExitData) {
+func runUploadSignedExitsRequest(t *testing.T, session *db.Session, signedExits []api.ExitData) {
 	// Marshal the deposit data
 	body, err := json.Marshal(signedExits)
 	if err != nil {
@@ -108,10 +108,7 @@ func runUploadSignedExitsRequest(t *testing.T, nodeKey *ecdsa.PrivateKey, signed
 	t.Logf("Created request")
 
 	// Add the auth header
-	err = auth.AddAuthorizationHeader(request, nodeKey)
-	if err != nil {
-		t.Fatalf("error adding auth header: %v", err)
-	}
+	auth.AddAuthorizationHeader(request, session)
 	t.Logf("Added auth header")
 
 	// Send the request
