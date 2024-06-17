@@ -173,13 +173,13 @@ func (m *NodeSetMockManager) GetValidatorStatus(network string, pubkey beacon.Va
 	// Check if the StakeWise vault has already seen it
 	for _, vault := range vaults {
 		if vault.Address == validator.VaultAddress && vault.UploadedData[validator.Pubkey] {
-			return api.StakeWiseStatus_Uploaded
+			return api.StakeWiseStatus_Registered
 		}
 	}
 
 	// Check to see if the deposit data has been used
 	if validator.DepositDataUsed {
-		return api.StakeWiseStatus_Uploading
+		return api.StakeWiseStatus_Uploaded
 	}
 	return api.StakeWiseStatus_Pending
 }
