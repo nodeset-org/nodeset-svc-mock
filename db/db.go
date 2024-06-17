@@ -389,3 +389,41 @@ func (d *Database) MarkDepositDataSetUploaded(vaultAddress common.Address, netwo
 	vault.LatestDepositDataSetIndex++
 	return nil
 }
+
+func (d *Database) MarkValidatorRegistered(vaultAddress common.Address, network string, data []beacon.ExtendedDepositData) error {
+	vaults, exists := d.StakeWiseVaults[network]
+	if !exists {
+		return fmt.Errorf("network [%s] not found in StakeWise vaults", network)
+	}
+
+	var vault *StakeWiseVault
+	for _, candidate := range vaults {
+		if candidate.Address == vaultAddress {
+			vault = candidate
+			break
+		}
+	}
+	if vault == nil {
+		return fmt.Errorf("vault with address [%s] not found", vaultAddress.Hex())
+	}
+
+	// Flag each validator as registered
+	for _, depositData := range data {
+		network := depositData.NetworkName
+		for _, user := range d.Users {
+			for _, node := range user.RegisteredNodes {
+				validators, exists := node.Validators[network]
+				if !exists {
+					continue
+				}
+				for _, validator := range validators {
+					if validator.Pubkey == beacon.ValidatorPubkey(depositData.PublicKey) {
+						validator.MarkActive()
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}

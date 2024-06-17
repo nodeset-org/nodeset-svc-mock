@@ -173,7 +173,9 @@ func (m *NodeSetMockManager) GetValidatorStatus(network string, pubkey beacon.Va
 	// Check if the StakeWise vault has already seen it
 	for _, vault := range vaults {
 		if vault.Address == validator.VaultAddress && vault.UploadedData[validator.Pubkey] {
-			return api.StakeWiseStatus_Registered
+			if validator.MarkedActive {
+				return api.StakeWiseStatus_Registered
+			}
 		}
 	}
 
@@ -207,4 +209,9 @@ func (m *NodeSetMockManager) UploadDepositDataToStakeWise(vaultAddress common.Ad
 // Call this once a deposit data set has been "uploaded" to StakeWise
 func (m *NodeSetMockManager) MarkDepositDataSetUploaded(vaultAddress common.Address, network string, data []beacon.ExtendedDepositData) error {
 	return m.database.MarkDepositDataSetUploaded(vaultAddress, network, data)
+}
+
+// Call this once a deposit data set has been "registered" to StakeWise
+func (m *NodeSetMockManager) MarkValidatorRegistered(vaultAddress common.Address, network string, data []beacon.ExtendedDepositData) error {
+	return m.database.MarkValidatorRegistered(vaultAddress, network, data)
 }
