@@ -13,6 +13,7 @@ type Validator struct {
 	SignedExit          api.ExitMessage
 	ExitMessageUploaded bool
 	DepositDataUsed     bool
+	MarkedActive        bool
 }
 
 func newValidator(depositData beacon.ExtendedDepositData, vaultAddress common.Address) *Validator {
@@ -25,6 +26,10 @@ func newValidator(depositData beacon.ExtendedDepositData, vaultAddress common.Ad
 
 func (v *Validator) UseDepositData() {
 	v.DepositDataUsed = true
+}
+
+func (v *Validator) MarkActive() {
+	v.MarkedActive = true
 }
 
 func (v *Validator) SetExitMessage(exitMessage api.ExitMessage) {
@@ -41,5 +46,6 @@ func (v *Validator) Clone() *Validator {
 		SignedExit:          v.SignedExit,
 		ExitMessageUploaded: v.ExitMessageUploaded,
 		DepositDataUsed:     v.DepositDataUsed,
+		MarkedActive:        v.MarkedActive,
 	}
 }

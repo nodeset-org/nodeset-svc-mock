@@ -58,9 +58,6 @@ const (
 	// DepositData uploaded to NodeSet, but hasn't been made part of a deposit data set yet
 	StakeWiseStatus_Pending StakeWiseStatus = "PENDING"
 
-	// DepositData uploaded to NodeSet, it's been added to a new deposit data set, but that set hasn't been uploaded to StakeWise yet
-	StakeWiseStatus_Uploading StakeWiseStatus = "UPLOADING"
-
 	// DepositData uploaded to NodeSet, uploaded to StakeWise, but hasn't been activated on Beacon yet
 	StakeWiseStatus_Uploaded StakeWiseStatus = "UPLOADED"
 
