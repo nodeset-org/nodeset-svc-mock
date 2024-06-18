@@ -390,7 +390,7 @@ func (d *Database) MarkDepositDataSetUploaded(vaultAddress common.Address, netwo
 	return nil
 }
 
-func (d *Database) MarkValidatorRegistered(vaultAddress common.Address, network string, data []beacon.ExtendedDepositData) error {
+func (d *Database) MarkValidatorsRegistered(vaultAddress common.Address, network string, data []beacon.ExtendedDepositData) error {
 	vaults, exists := d.StakeWiseVaults[network]
 	if !exists {
 		return fmt.Errorf("network [%s] not found in StakeWise vaults", network)

@@ -212,6 +212,6 @@ func (m *NodeSetMockManager) MarkDepositDataSetUploaded(vaultAddress common.Addr
 }
 
 // Call this once a deposit data set has been "registered" to StakeWise
-func (m *NodeSetMockManager) MarkValidatorRegistered(vaultAddress common.Address, network string, data []beacon.ExtendedDepositData) error {
-	return m.database.MarkValidatorRegistered(vaultAddress, network, data)
+func (m *NodeSetMockManager) MarkValidatorsRegistered(vaultAddress common.Address, network string, data []beacon.ExtendedDepositData) error {
+	return m.database.MarkValidatorsRegistered(vaultAddress, network, data)
 }
