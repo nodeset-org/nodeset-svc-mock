@@ -32,12 +32,12 @@ func TestRecoverPubkey(t *testing.T) {
 
 	// Sign a message
 	message := []byte("hello world")
-	signature, err := CreateSignature(message, privateKey)
+	signature, err := createSignature(message, privateKey)
 	require.NoError(t, err)
 	t.Logf("Signed message, signature = %x", signature)
 
 	// Get the pubkey from the signature
-	recoveredPubkey, err := GetAddressFromSignature(message, signature)
+	recoveredPubkey, err := getAddressFromSignature(message, signature)
 	require.NoError(t, err)
 	require.Equal(t, pubkey, recoveredPubkey)
 	t.Logf("Recovered pubkey matches, %s", recoveredPubkey.Hex())
