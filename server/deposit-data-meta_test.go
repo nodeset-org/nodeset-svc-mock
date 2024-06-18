@@ -35,20 +35,39 @@ func TestDepositDataMeta(t *testing.T) {
 		t.Fatalf("error getting private key: %v", err)
 	}
 	node0Pubkey := crypto.PubkeyToAddress(node0Key.PublicKey)
-	err = server.manager.Database.AddUser(test.User0Email)
+	err = server.manager.AddUser(test.User0Email)
 	if err != nil {
 		t.Fatalf("error adding user: %v", err)
 	}
-	err = server.manager.Database.AddNodeAccount(test.User0Email, node0Pubkey)
+	err = server.manager.WhitelistNodeAccount(test.User0Email, node0Pubkey)
 	if err != nil {
-		t.Fatalf("error adding node account: %v", err)
+		t.Fatalf("error whitelisting node account: %v", err)
 	}
-	err = server.manager.Database.AddStakeWiseVault(test.StakeWiseVaultAddress, test.Network)
+	regSig, err := auth.GetSignatureForRegistration(test.User0Email, node0Pubkey, node0Key)
+	if err != nil {
+		t.Fatalf("error getting signature for registration: %v", err)
+	}
+	err = server.manager.RegisterNodeAccount(test.User0Email, node0Pubkey, regSig)
+	if err != nil {
+		t.Fatalf("error registering node account: %v", err)
+	}
+	err = server.manager.AddStakeWiseVault(test.StakeWiseVaultAddress, test.Network)
 	if err != nil {
 		t.Fatalf("error adding StakeWise vault to database: %v", err)
 	}
-	vault := server.manager.Database.StakeWiseVaults[test.Network][0]
+	vault := server.manager.GetStakeWiseVault(test.StakeWiseVaultAddress, test.Network)
 	vault.LatestDepositDataSetIndex = depositDataSet
+
+	// Create a session
+	session := server.manager.CreateSession()
+	loginSig, err := auth.GetSignatureForLogin(session.Nonce, node0Pubkey, node0Key)
+	if err != nil {
+		t.Fatalf("error getting signature for login: %v", err)
+	}
+	err = server.manager.Login(session.Nonce, node0Pubkey, loginSig)
+	if err != nil {
+		t.Fatalf("error logging in: %v", err)
+	}
 
 	// Create the request
 	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/%s", port, api.DepositDataMetaPath), nil)
@@ -62,10 +81,7 @@ func TestDepositDataMeta(t *testing.T) {
 	t.Logf("Created request")
 
 	// Add the auth header
-	err = auth.AddAuthorizationHeader(request, node0Key)
-	if err != nil {
-		t.Fatalf("error adding auth header: %v", err)
-	}
+	auth.AddAuthorizationHeader(request, session)
 	t.Logf("Added auth header")
 
 	// Send the request
@@ -85,13 +101,13 @@ func TestDepositDataMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error reading the response body: %v", err)
 	}
-	var parsedResponse api.DepositDataMetaResponse
+	var parsedResponse api.NodeSetResponse[api.DepositDataMetaData]
 	err = json.Unmarshal(bytes, &parsedResponse)
 	if err != nil {
 		t.Fatalf("error deserializing response: %v", err)
 	}
 
 	// Make sure the response is correct
-	require.Equal(t, depositDataSet, parsedResponse.Version)
-	t.Logf("Received correct response - version = %d", parsedResponse.Version)
+	require.Equal(t, depositDataSet, parsedResponse.Data.Version)
+	t.Logf("Received correct response - version = %d", parsedResponse.Data.Version)
 }

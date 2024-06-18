@@ -111,7 +111,7 @@ func addUserToDatabase(t *testing.T, db *db.Database, userEmail string) {
 	}
 }
 
-// Create a node and add it to the database
+// Create a node, register it with the user, and log it in with a new session
 func createNodeAndAddToDatabase(t *testing.T, db *db.Database, userEmail string, index uint) common.Address {
 	nodeKey, exists := NodeKeys[index]
 	if !exists {
@@ -123,9 +123,24 @@ func createNodeAndAddToDatabase(t *testing.T, db *db.Database, userEmail string,
 		NodeKeys[index] = nodeKey
 	}
 	nodeAddress := crypto.PubkeyToAddress(nodeKey.PublicKey)
-	err := db.AddNodeAccount(userEmail, nodeAddress)
+
+	// Whitelist the node
+	err := db.WhitelistNodeAccount(userEmail, nodeAddress)
 	if err != nil {
-		t.Fatalf("Error adding node [%s] to user [%s]: %v", nodeAddress.Hex(), userEmail, err)
+		t.Fatalf("Error authorizing node [%s] with user [%s]: %v", nodeAddress.Hex(), userEmail, err)
+	}
+
+	// Register the node
+	err = db.RegisterNodeAccount(userEmail, nodeAddress)
+	if err != nil {
+		t.Fatalf("Error registering node [%s] with user [%s]: %v", nodeAddress.Hex(), userEmail, err)
+	}
+
+	// Create a new session for it
+	session := db.CreateSession()
+	err = db.Login(nodeAddress, session.Nonce)
+	if err != nil {
+		t.Fatalf("Error logging in node [%s]: %v", nodeAddress.Hex(), err)
 	}
 	return nodeAddress
 }

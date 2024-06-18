@@ -10,6 +10,7 @@ import (
 
 	"github.com/nodeset-org/nodeset-svc-mock/api"
 	"github.com/nodeset-org/nodeset-svc-mock/auth"
+	"github.com/nodeset-org/nodeset-svc-mock/db"
 	idb "github.com/nodeset-org/nodeset-svc-mock/internal/db"
 	"github.com/nodeset-org/nodeset-svc-mock/internal/test"
 	"github.com/rocket-pool/node-manager-core/utils"
@@ -29,20 +30,20 @@ func TestGetDepositData(t *testing.T) {
 
 	// Provision the database
 	db := idb.ProvisionFullDatabase(t, logger, true)
-	server.manager.Database = db
+	server.manager.SetDatabase(db)
 
 	// Run a get deposit data request
-	parsedResponse := runGetDepositDataRequest(t)
+	parsedResponse := runGetDepositDataRequest(t, db.Sessions[0])
 
 	// Make sure the response is correct
 	vault := db.StakeWiseVaults[test.Network][0]
-	require.Equal(t, vault.LatestDepositDataSetIndex, parsedResponse.Version)
-	require.Equal(t, vault.LatestDepositDataSet, parsedResponse.Data)
-	require.Greater(t, len(parsedResponse.Data), 0)
-	t.Logf("Received correct response - version = %d, deposit data matches", parsedResponse.Version)
+	require.Equal(t, vault.LatestDepositDataSetIndex, parsedResponse.Data.Version)
+	require.Equal(t, vault.LatestDepositDataSet, parsedResponse.Data.DepositData)
+	require.Greater(t, len(parsedResponse.Data.DepositData), 0)
+	t.Logf("Received correct response - version = %d, deposit data matches", parsedResponse.Data.Version)
 }
 
-func runGetDepositDataRequest(t *testing.T) api.DepositDataResponse {
+func runGetDepositDataRequest(t *testing.T, session *db.Session) api.NodeSetResponse[api.DepositDataData] {
 	// Create the request
 	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/api/%s", port, api.DepositDataPath), nil)
 	if err != nil {
@@ -55,10 +56,7 @@ func runGetDepositDataRequest(t *testing.T) api.DepositDataResponse {
 	t.Logf("Created request")
 
 	// Add the auth header
-	err = auth.AddAuthorizationHeader(request, idb.NodeKeys[0])
-	if err != nil {
-		t.Fatalf("error adding auth header: %v", err)
-	}
+	auth.AddAuthorizationHeader(request, session)
 	t.Logf("Added auth header")
 
 	// Send the request
@@ -74,7 +72,7 @@ func runGetDepositDataRequest(t *testing.T) api.DepositDataResponse {
 	if err != nil {
 		t.Fatalf("error reading the response body: %v", err)
 	}
-	var parsedResponse api.DepositDataResponse
+	var parsedResponse api.NodeSetResponse[api.DepositDataData]
 	err = json.Unmarshal(bytes, &parsedResponse)
 	if err != nil {
 		t.Fatalf("error deserializing response: %v", err)

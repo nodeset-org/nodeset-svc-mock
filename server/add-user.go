@@ -7,7 +7,7 @@ import (
 
 func (s *NodeSetMockServer) addUser(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		handleInvalidMethod(s.logger, w)
+		handleInvalidMethod(w, s.logger)
 		return
 	}
 
@@ -15,12 +15,12 @@ func (s *NodeSetMockServer) addUser(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	email := query.Get("email")
 	if email == "" {
-		handleInputError(s.logger, w, fmt.Errorf("missing email query parameter"))
+		handleInputError(w, s.logger, fmt.Errorf("missing email query parameter"))
 		return
 	}
 
 	// Create a new deposit data set
-	err := s.manager.Database.AddUser(email)
+	err := s.manager.AddUser(email)
 	if err != nil {
 		handleServerError(w, s.logger, err)
 		return

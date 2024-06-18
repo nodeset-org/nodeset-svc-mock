@@ -34,7 +34,7 @@ func TestDatabaseClone(t *testing.T) {
 	vault := db.StakeWiseVaults[test.Network][0]
 	var pubkey beacon.ValidatorPubkey
 	found := false
-	for _, node := range user2.Nodes {
+	for _, node := range user2.RegisteredNodes {
 		validators := node.Validators[test.Network]
 		for _, validator := range validators {
 			if vault.UploadedData[validator.Pubkey] {
@@ -88,8 +88,19 @@ func compareDatabases(t *testing.T, db *db.Database, clone *db.Database) {
 	for i, user := range db.Users {
 		cloneUser := clone.Users[i]
 		assert.NotSame(t, user, cloneUser)
-		for j, node := range user.Nodes {
-			cloneNode := cloneUser.Nodes[j]
+		for j, node := range user.WhitelistedNodes {
+			cloneNode := cloneUser.WhitelistedNodes[j]
+			assert.NotSame(t, node, cloneNode)
+			for k, validators := range node.Validators {
+				cloneValidators := cloneNode.Validators[k]
+				for l, validator := range validators {
+					cloneValidator := cloneValidators[l]
+					assert.NotSame(t, validator, cloneValidator)
+				}
+			}
+		}
+		for j, node := range user.RegisteredNodes {
+			cloneNode := cloneUser.RegisteredNodes[j]
 			assert.NotSame(t, node, cloneNode)
 			for k, validators := range node.Validators {
 				cloneValidators := cloneNode.Validators[k]
